@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>RDV CRM - V26 Clean & Live</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        body { background-color: #f8fafc; font-family: 'Segoe UI', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+        
+        /* Animations */
+        @keyframes fadeIn { from {opacity:0; transform: translateY(10px);} to {opacity:1; transform: translateY(0);} }
+        .fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        
+        @keyframes popIn { 0%{transform: scale(0.9); opacity: 0;} 100%{transform: scale(1); opacity: 1;} }
+        .pop-in { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        @keyframes slideUp { from {transform: translateY(20px); opacity: 0;} to {transform: translateY(0); opacity: 1;} }
+        .slide-up { animation: slideUp 0.4s ease-out forwards; }
+
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); } 20%, 40%, 60%, 80% { transform: translateX(5px); } }
+        .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        
+        /* Confetti */
+        .confetti { position: fixed; width: 10px; height: 10px; background-color: #f00; animation: fall linear forwards; z-index: 9999; pointer-events: none; }
+        @keyframes fall { to { transform: translateY(100vh) rotate(720deg); } }
+
+        /* Scrollbar Masquée */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        .logo-img { width: 20px; height: 20px; object-fit: contain; border-radius: 4px; }
+        .badge-status { padding: 4px 8px; border-radius: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+        .custom-checkbox { width: 18px; height: 18px; cursor: pointer; accent-color: #2563EB; }
+
+        /* Style spécifique du Date Picker V22 */
+        .date-card {
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s;
+            border: 2px solid transparent;
+        }
+        .date-card-selected {
+            border-color: #2563EB; /* blue-600 */
+            background-color: #2563EB;
+            color: white;
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.5), 0 4px 6px -2px rgba(37, 99, 235, 0.5);
+        }
+
+        /* --- NOUVEAUX STYLES POUR RENDRE-VOUS EN COURS --- */
+        @keyframes status-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7); } 
+            70% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+        }
+        .status-label-active {
+            font-size: 10px; font-weight: 900; text-transform: uppercase; color: #22c55e;
+            display: flex; align-items: center; padding: 4px 8px; border-radius: 6px;
+            background-color: #f0fdf4; border: 1px solid #bbf7d0; letter-spacing: 0.5px;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+        .status-label-active .live-dot {
+            width: 8px; height: 8px; background-color: #22c55e; border-radius: 50%; margin-right: 6px;
+            animation: status-pulse 1.5s infinite;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="h-screen flex flex-col overflow-hidden text-slate-800">
+
+    <div v-if="!user.logged" class="fixed inset-0 bg-slate-900 z-[200] flex items-center justify-center p-4">
+        
+        <div v-if="!loginAdminSelection" class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center fade-in relative overflow-hidden">
+            
+            <div class="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center text-white text-3xl mx-auto mb-6 shadow-lg shadow-blue-500/30 relative z-10">
+                <i class="fa-solid fa-address-book"></i>
+            </div>
+            
+            <h1 class="text-2xl font-bold mb-6 relative z-10">Connexion CRM</h1>
+            
+            <div class="space-y-4 relative z-10">
+                <input type="text" v-model="loginEmail" @keyup.enter="login" placeholder="Identifiant / Email" autocomplete="username" class="w-full p-4 border-2 border-gray-200 rounded-xl text-center text-lg mb-2 outline-none focus:border-blue-600 transition">
+                <input type="password" v-model="loginPass" @keyup.enter="login" placeholder="Mot de passe" autocomplete="current-password" class="w-full p-4 border-2 border-gray-200 rounded-xl text-center text-lg tracking-widest outline-none focus:border-blue-600 transition">
+            </div>
+
+            <button @click="login" class="relative z-10 w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 transition transform active:scale-95 mt-6 mb-2">Se connecter</button>
+            <div class="mt-4 text-xs text-gray-400 relative z-10">Accès sécurisé</div>
+        </div>
+
+        <div v-else class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center pop-in">
+            <h2 class="text-xl font-bold mb-6 text-slate-700">Qui se connecte ?</h2>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button v-for="name in adminNamesList" :key="name" @click="finalizeAdminLogin(name)" class="p-4 bg-slate-100 hover:bg-blue-100 border-2 border-transparent hover:border-blue-500 rounded-xl font-bold text-slate-700 hover:text-blue-700 transition flex flex-col items-center gap-2">
+                    <i class="fa-solid fa-user-tie text-2xl"></i>
+                    {{ name }}
+                </button>
+            </div>
+            <button @click="loginAdminSelection=false" class="text-gray-400 hover:text-gray-600 underline text-sm">Retour</button>
+        </div>
+    </div>
+
+    <div v-else class="flex flex-1 h-full relative">
+        
+        <div v-if="mobileMenuOpen" @click="mobileMenuOpen=false" class="fixed inset-0 bg-black/50 z-30 md:hidden backdrop-blur-sm"></div>
+
+        <aside :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'" class="fixed md:relative w-64 bg-white shadow-xl flex flex-col z-40 h-full transition-transform duration-300 ease-in-out">
+            <div class="p-6 border-b flex items-center gap-3">
+                <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold flex-shrink-0"><i class="fa-solid fa-calendar-check"></i></div>
+                <div class="min-w-0">
+                    <h1 class="font-bold text-lg leading-tight truncate">RDV Manager</h1>
+                    <span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded text-slate-500 uppercase font-bold truncate block">{{ user.name }}</span>
+                </div>
+                <button @click="mobileMenuOpen=false" class="ml-auto md:hidden text-gray-400"><i class="fa-solid fa-xmark text-xl"></i></button>
+            </div>
+
+            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                <button @click="changeView('dashboard'); mobileMenuOpen=false" :class="view==='dashboard'?'bg-blue-50 text-blue-600 font-bold border-blue-200':'text-gray-500 hover:bg-gray-50 border-transparent'" class="w-full text-left p-3 rounded-xl flex items-center gap-3 border transition"><i class="fa-solid fa-chart-line w-5 text-center"></i> Tableau de bord</button>
+                <button @click="changeView('list'); mobileMenuOpen=false" :class="view==='list'?'bg-blue-50 text-blue-600 font-bold border-blue-200':'text-gray-500 hover:bg-gray-50 border-transparent'" class="w-full text-left p-3 rounded-xl flex items-center gap-3 border transition"><i class="fa-solid fa-address-book w-5 text-center"></i> Tous les RDV</button>
+                <button @click="changeView('rappels'); mobileMenuOpen=false" :class="{'border-red-300 bg-red-50 text-red-600': rappelCount > 0}" class="w-full text-left p-3 rounded-xl flex items-center gap-3 border border-transparent hover:bg-gray-50 transition mt-4"><i class="fa-solid fa-bell w-5 text-center"></i> Rappels <span v-if="rappelCount>0" class="ml-auto bg-red-600 text-white text-xs px-2 py-1 rounded-full font-bold">{{ rappelCount }}</span></button>
+                <button v-if="pendingStatusCount > 0" @click="changeView('pending_status'); mobileMenuOpen=false" class="w-full text-left p-3 rounded-2xl flex items-center gap-3 bg-purple-100 border border-purple-300 text-purple-700 mt-2 font-bold animate-pulse"><i class="fa-solid fa-clipboard-question w-5 text-center"></i> Statuts à définir <span class="ml-auto bg-purple-600 text-white text-xs px-2 py-1 rounded-full">{{ pendingStatusCount }}</span></button>
+                <button v-if="confirmCount > 0" @click="changeView('confirmations'); mobileMenuOpen=false" class="w-full text-left p-3 rounded-2xl flex items-center gap-3 bg-orange-100 border border-orange-300 text-orange-700 mt-2 font-bold animate-pulse"><i class="fa-solid fa-circle-exclamation w-5 text-center"></i> À Confirmer <span class="ml-auto bg-orange-600 text-white text-xs px-2 py-1 rounded-full">{{ confirmCount }}</span></button>
+            </nav>
+
+            <div class="p-4 border-t space-y-2">
+                <button @click="changeView('trash'); mobileMenuOpen=false" :class="view==='trash'?'bg-gray-100 text-gray-800 font-bold':'text-gray-400 hover:text-gray-600 hover:bg-gray-50'" class="w-full text-left p-3 rounded-xl flex items-center gap-3 transition"><i class="fa-solid fa-trash-can w-5 text-center"></i> Corbeille <span v-if="trashCount > 0" class="ml-auto bg-gray-200 text-gray-600 text-xs px-2 py-1 rounded-full font-bold">{{ trashCount }}</span></button>
+            </div>
+
+            <div class="p-4 border-t space-y-2">
+                <button v-if="user.role==='admin'" @click="openSettings(); mobileMenuOpen=false" class="w-full text-left p-3 rounded-xl flex items-center gap-3 text-slate-600 hover:bg-slate-100 transition font-bold"><i class="fa-solid fa-gear w-5 text-center"></i> Réglages</button>
+                <button @click="logout" class="w-full text-left p-3 rounded-xl flex items-center gap-3 text-red-400 hover:text-red-600 hover:bg-red-50 transition font-bold"><i class="fa-solid fa-power-off w-5 text-center"></i> Déconnexion</button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col bg-[#f8fafc] relative overflow-hidden h-full">
+            <header class="bg-white/80 backdrop-blur-sm p-4 shadow-sm flex justify-between items-center z-10 border-b border-slate-200">
+                <div class="flex items-center gap-3">
+                    <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden w-10 h-10 bg-white border border-slate-200 rounded-xl text-slate-700 shadow-sm flex items-center justify-center">
+                        <i class="fa-solid fa-bars"></i>
+                    </button>
+                    <button @click="startWizard" class="bg-slate-900 hover:bg-slate-800 text-white px-4 md:px-6 py-2.5 rounded-full font-bold shadow-lg flex items-center gap-2 transform active:scale-95 transition text-sm md:text-base">
+                        <i class="fa-solid fa-plus"></i> <span class="hidden md:inline">Nouveau RDV</span><span class="md:hidden">Nouveau</span>
+                    </button>
+                </div>
+                <div v-if="user.role==='admin'" class="bg-green-50 border border-green-200 px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-right">
+                    <p class="text-[9px] md:text-[10px] text-green-600 font-bold uppercase tracking-wider flex items-center justify-end gap-1"><i class="fa-regular fa-calendar"></i> {{ currentFullDateLabel }}</p>
+                    <p class="text-lg md:text-xl font-bold text-green-700">{{ formatPrice(stats.ca) }}</p>
+                </div>
+            </header>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 pb-20 md:pb-6">
+                <div v-if="view==='dashboard'" class="space-y-6 fade-in">
+                    <div class="flex flex-col md:flex-row gap-6 mb-6 items-stretch">
+                        <div class="flex-1 flex flex-col md:flex-row md:items-center gap-3">
+                            <h2 class="text-2xl md:text-3xl font-bold text-slate-800 uppercase tracking-tight">{{ currentFullDateLabel }}</h2>
+                            
+                            <button @click="showLive" :class="activeRdvCount > 0 ? 'bg-green-100 text-green-700 border-green-200 animate-pulse' : 'bg-slate-100 text-slate-400 border-slate-200'" class="flex items-center gap-2 px-4 py-2 rounded-full font-bold border transition shadow-sm hover:shadow-md">
+                                <span :class="activeRdvCount > 0 ? 'bg-green-500' : 'bg-slate-300'" class="w-3 h-3 rounded-full block"></span>
+                                {{ activeRdvCount }} En cours
+                            </button>
+                        </div>
+                        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex items-center gap-4 min-w-[300px] relative overflow-hidden" :class="conversionRateColor"><div class="absolute inset-0 bg-white opacity-80 z-0"></div><div class="z-10 text-5xl emoji-bounce filter drop-shadow-md">{{ conversionEmoji }}</div><div class="z-10 flex-1"><p class="text-xs font-bold uppercase tracking-widest opacity-60">Taux de conversion</p><div class="flex items-baseline gap-2"><span class="text-4xl font-black">{{ conversionRate }}%</span><span class="text-xs font-medium opacity-70">Honorés / Total</span></div><div class="w-full bg-black/10 h-1.5 rounded-full mt-1 overflow-hidden"><div class="h-full bg-black/50 transition-all duration-1000" :style="{width: conversionRate + '%'}"></div></div></div></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                        <div @click="showUpcoming" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-300 cursor-pointer transition group"><div class="flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider group-hover:text-blue-500">À venir</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.upcoming }}</p></div><div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-xl group-hover:bg-blue-600 group-hover:text-white transition"><i class="fa-solid fa-calendar-days"></i></div></div></div>
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition"><div class="flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Honorés</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.honored }}</p></div><div class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 text-xl"><i class="fa-solid fa-check"></i></div></div></div>
+                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition"><div class="flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Pas Venus</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.noshow }}</p></div><div class="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 text-xl"><i class="fa-solid fa-user-xmark"></i></div></div></div>
+                    </div>
+                    <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 md:p-8">
+                        <h2 class="text-xl font-bold mb-6 flex items-center gap-3 text-slate-800"><i class="fa-regular fa-clock text-blue-500"></i> Timeline Aujourd'hui</h2>
+                        <div class="space-y-4 relative"><div class="absolute left-[35px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
+                            <div v-for="rdv in sortedDaily" :key="rdv.id" @click="openRdvFiche(rdv)" class="relative z-10 flex flex-col md:flex-row md:items-center p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-white hover:border-blue-200 hover:shadow-lg cursor-pointer transition group gap-2 md:gap-0">
+                                <div class="flex items-center w-full md:w-auto">
+                                    <div class="w-16 md:w-20 font-bold text-lg text-slate-500 group-hover:text-blue-600 transition text-center bg-white rounded-xl py-2 mr-4 shadow-sm border border-slate-100 flex-shrink-0">{{ rdv.heure }}</div>
+                                    <div class="font-bold text-slate-800 text-lg flex items-center gap-2 md:hidden">{{ rdv.civilite }} {{ rdv.nom }} <i v-if="isEnCours(rdv)" class="fa-solid fa-circle text-[10px] text-green-500 animate-pulse"></i></div>
+                                </div>
+                                <div class="flex-1 min-w-0 md:ml-4">
+                                    <div class="font-bold text-slate-800 text-lg hidden md:flex items-center gap-2">
+                                        {{ rdv.civilite }} {{ rdv.nom }} 
+                                        <i v-if="isEnCours(rdv)" class="fa-solid fa-circle text-[10px] text-green-500 animate-pulse"></i>
+                                        <span v-if="rdv.geste_commercial" class="ml-2 bg-red-100 text-red-600 text-xs px-2 py-0.5 rounded-full border border-red-200 font-bold animate-fadeIn">
+                                            <i class="fa-solid fa-gift"></i> {{ user.role === 'admin' ? '-' + rdv.geste_commercial + '€' : 'Geste co.' }}
+                                        </span>
+                                    </div>
+                                    <div v-if="isEnCours(rdv)" class="w-full max-w-xs h-1.5 bg-gray-200 rounded-full mt-2 overflow-hidden shadow-inner">
+                                        <div class="h-full bg-green-500 transition-all duration-1000 ease-linear shadow-[0_0_10px_rgba(34,197,94,0.6)]" :style="{width: getProgressPercent(rdv) + '%'}"></div>
+                                    </div>
+                                    <div class="text-sm text-slate-500 flex flex-wrap items-center gap-2 md:gap-3 mt-1 font-medium">
+                                        <span class="text-slate-400 font-bold text-xs"><i class="fa-regular fa-calendar"></i> {{ formatDateShort(rdv.date) }}</span>
+                                        <span class="bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-600"><i class="fa-solid fa-car text-slate-400"></i> {{ rdv.modele }}</span>
+                                        <span class="flex items-center gap-1 text-xs opacity-70"><img :src="getLogo(rdv.source)" class="w-4 h-4 rounded-sm"> {{ rdv.source }}</span>
+                                        <div class="w-full mt-1 flex flex-wrap gap-2">
+                                            <span class="text-[10px] font-bold text-blue-600 uppercase bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                                                <i class="fa-solid fa-building"></i> {{ getAgenceName(rdv.agenceId) }}
+                                            </span>
+                                            <span class="text-[10px] font-bold text-slate-500 uppercase bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                                                <i class="fa-solid fa-user-tag"></i> {{ rdv.createdBy || 'Système' }}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between md:justify-end mt-2 md:mt-0">
+                                    <div v-if="isEnCours(rdv)" class="status-label-active mr-4"><span class="live-dot"></span>Rendez-vous en cours</div>
+                                    <div v-else-if="isLateAndNoStatus(rdv)" class="mr-4 bg-purple-100 text-purple-600 px-3 py-1 rounded-full font-bold text-xs animate-pulse border border-purple-200 shadow-sm"><i class="fa-solid fa-clipboard-question"></i> STATUT ?</div>
+                                    <span v-else :class="statusClass(rdv.statut)" class="badge-status shadow-sm">{{ displayStatus(rdv) }}</span>
+                                    <div class="ml-4 text-slate-300 group-hover:text-blue-500 transition"><i class="fa-solid fa-chevron-right"></i></div>
+                                </div>
+                            </div>
+                            <div v-if="sortedDaily.length===0" class="text-center text-slate-400 py-10 italic bg-slate-50 rounded-2xl border border-dashed border-slate-200"><i class="fa-solid fa-mug-hot text-2xl mb-2"></i><br>Aucun rendez-vous aujourd'hui.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="view==='list'" class="bg-white rounded-3xl shadow-sm border border-slate-100 h-full flex flex-col overflow-hidden fade-in relative">
+                    <div class="p-4 border-b bg-slate-50 space-y-3">
+                        <div class="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+                            <div class="relative flex-1">
+                                <i class="fa-solid fa-search absolute left-3 top-3 text-gray-400"></i>
+                                <input v-model="search" placeholder="Rechercher nom, tel, véhicule..." class="w-full pl-10 p-2 border rounded-xl outline-none focus:border-blue-500 bg-white">
+                            </div>
+                            <div v-if="filteredList.length > 0" class="text-xs font-bold text-slate-400 uppercase text-center md:text-right">{{ filteredList.length }} RDV trouvés</div>
+                        </div>
+                        <div class="flex flex-col md:flex-row flex-wrap gap-2 items-stretch md:items-center">
+                            <div class="relative">
+                                <select v-model="listFilters.agenceId" class="w-full md:w-auto appearance-none bg-white border px-4 py-2 pr-8 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer shadow-sm"><option value="">Toutes les agences</option><option v-for="ag in agences" :key="ag.id" :value="ag.id">{{ ag.nom }}</option></select>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-xs text-gray-400 pointer-events-none"></i>
+                            </div>
+                            
+                            <div class="relative">
+                                <select v-model="listFilters.prospecteur" class="w-full md:w-auto appearance-none bg-white border px-4 py-2 pr-8 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500 cursor-pointer shadow-sm">
+                                    <option value="">Tous les prospecteurs</option>
+                                    <option v-for="p in allProspectors" :key="p" :value="p">{{ p }}</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down absolute right-3 top-3 text-xs text-gray-400 pointer-events-none"></i>
+                            </div>
+
+                            <input type="date" v-model="listFilters.date" class="bg-white border px-4 py-2 rounded-lg text-sm font-bold text-slate-700 outline-none focus:border-blue-500 shadow-sm w-full md:w-auto">
+                            
+                            <button v-if="currentFilter === 'live'" @click="currentFilter='all'" class="px-4 py-2 rounded-lg text-sm font-bold bg-green-100 text-green-700 border border-green-200 shadow-inner flex items-center justify-center gap-2 animate-pulse"><i class="fa-solid fa-video"></i> EN COURS ({{ activeRdvCount }})</button>
+                            <button v-else @click="currentFilter = (currentFilter==='upcoming'?'all':'upcoming')" :class="currentFilter==='upcoming' ? 'bg-blue-600 text-white shadow-md' : 'bg-white border text-slate-600'" class="px-4 py-2 rounded-lg text-sm font-bold transition flex items-center justify-center gap-2"><i class="fa-solid fa-clock"></i> À venir</button>
+                            
+                            <button v-if="listFilters.agenceId || listFilters.prospecteur || listFilters.date || search || currentFilter!=='all'" @click="resetListFilters" class="px-4 py-2 rounded-lg text-sm font-bold text-red-500 hover:bg-red-50 transition border border-transparent hover:border-red-200"><i class="fa-solid fa-xmark"></i> Effacer</button>
+                        </div>
+                    </div>
+                    <div class="overflow-auto flex-1 p-0 pb-20 hidden md:block">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 shadow-sm font-bold">
+                                <tr>
+                                    <th v-if="user.role==='admin'" class="p-4 w-10"><input type="checkbox" class="custom-checkbox" @change="selectAll($event)" :checked="isAllSelected && displayedList.length > 0"></th>
+                                    <th class="p-4">Date</th>
+                                    <th class="p-4">Client</th>
+                                    <th class="p-4">Véhicule</th>
+                                    <th class="p-4">Source</th>
+                                    <th class="p-4">Agence</th>
+                                    <th class="p-4">Créé par</th>
+                                    <th class="p-4">Statut</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr v-for="rdv in displayedList" :key="rdv.id" @click="openRdvFiche(rdv)" class="border-b hover:bg-blue-50 cursor-pointer transition" :class="{'bg-blue-50': selectedIds.includes(rdv.id)}">
+                                    <td v-if="user.role==='admin'" class="p-4 text-center" @click.stop><input type="checkbox" class="custom-checkbox" :checked="selectedIds.includes(rdv.id)" @change="toggleSelection(rdv.id)"></td>
+                                    <td class="p-4"><div class="font-bold text-slate-700">{{ formatDateShort(rdv.date) }}</div><div class="text-xs text-slate-400">{{ rdv.heure }}</div></td>
+                                    <td class="p-4"><div class="font-bold">{{ rdv.nom }}</div><div class="text-xs text-blue-500 font-mono">{{ rdv.telephone }}</div></td>
+                                    <td class="p-4 font-medium">{{ rdv.modele }}</td>
+                                    <td class="p-4"><div class="flex items-center gap-2 opacity-80"><img :src="getLogo(rdv.source)" class="logo-img"><span>{{ rdv.source }}</span></div></td>
+                                    <td class="p-4 text-xs font-bold text-blue-600 uppercase">{{ getAgenceName(rdv.agenceId) }}</td>
+                                    <td class="p-4 text-xs font-bold text-slate-500 uppercase">{{ rdv.createdBy || 'Système' }}</td>
+                                    <td class="p-4">
+                                        <div v-if="isEnCours(rdv)" class="status-label-active"><span class="live-dot"></span>En cours</div>
+                                        <span v-else :class="statusClass(rdv.statut)" class="badge-status">{{ displayStatus(rdv) }}</span>
+                                        <div v-if="rdv.geste_commercial" class="mt-1 inline-block bg-red-50 text-red-600 text-[9px] px-1.5 py-0.5 rounded border border-red-100 font-bold uppercase"><i class="fa-solid fa-gift"></i> {{ user.role === 'admin' ? '-' + rdv.geste_commercial + '€' : 'Geste' }}</div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="md:hidden flex-1 overflow-y-auto p-4 space-y-3 pb-24 bg-slate-100">
+                        <div v-for="rdv in displayedList" :key="rdv.id" @click="openRdvFiche(rdv)" class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 relative">
+                            <div v-if="user.role==='admin'" class="absolute top-4 right-4" @click.stop><input type="checkbox" class="custom-checkbox" :checked="selectedIds.includes(rdv.id)" @change="toggleSelection(rdv.id)"></div>
+                            <div class="flex justify-between items-start mb-2 pr-8">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-400 uppercase flex items-center gap-1"><i class="fa-regular fa-calendar"></i> {{ formatDateShort(rdv.date) }} à {{ rdv.heure }}</div>
+                                    <div class="text-lg font-bold text-slate-800">{{ rdv.nom }}</div>
+                                    <div class="text-sm text-blue-600 font-mono">{{ rdv.telephone }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 mb-3 text-sm text-slate-600 font-medium"><i class="fa-solid fa-car"></i> {{ rdv.modele }}</div>
+                            <div class="flex justify-between items-end border-t pt-3 mt-2">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{{ getAgenceName(rdv.agenceId) }}</span>
+                                    <div class="flex items-center gap-1 text-xs opacity-80"><img :src="getLogo(rdv.source)" class="w-4 h-4 rounded-sm"> {{ rdv.source }}</div>
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase mt-1">Par: {{ rdv.createdBy || 'Système' }}</span>
+                                </div>
+                                <div class="flex flex-col items-end gap-1">
+                                    <div v-if="isEnCours(rdv)" class="status-label-active"><span class="live-dot"></span>En cours</div>
+                                    <span v-else :class="statusClass(rdv.statut)" class="badge-status">{{ displayStatus(rdv) }}</span>
+                                    <div v-if="rdv.geste_commercial" class="bg-red-50 text-red-600 text-[9px] px-2 py-0.5 rounded border border-red-100 font-bold uppercase"><i class="fa-solid fa-gift"></i> {{ user.role === 'admin' ? '-' + rdv.geste_commercial + '€' : 'Geste' }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-if="displayedList.length < filteredList.length" class="p-4 text-center">
+                        <button @click="displayLimit += 20" class="bg-white border-2 border-slate-200 text-slate-600 px-6 py-3 rounded-xl font-bold hover:bg-slate-50 hover:border-blue-200 hover:text-blue-600 transition shadow-sm w-full md:w-auto">
+                            👇 Voir plus de rendez-vous
+                        </button>
+                    </div>
+
+                    <div v-if="selectedIds.length > 0" class="absolute bottom-6 left-4 right-4 md:left-6 md:right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between slide-up z-20 gap-3">
+                        <div class="font-bold pl-2"><span class="text-blue-400 text-xl">{{ selectedIds.length }}</span> sélectionnés</div>
+                        <div class="flex gap-2 w-full md:w-auto justify-end">
+                            <button @click="openBulkConfirm('restore_trash', 'Restaurer')" class="bg-green-600 hover:bg-green-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Tout Restaurer</button>
+                            <button v-if="user.role==='admin'" @click="openBulkConfirm('delete_trash', 'Supprimer définitivement')" class="bg-red-600 hover:bg-red-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Tout Supprimer</button>
+                            <button @click="selectedIds=[]" class="ml-2 text-gray-400 hover:text-white px-2">✕</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="view==='trash'" class="bg-white rounded-3xl shadow-sm border border-slate-100 h-full flex flex-col overflow-hidden fade-in relative">
+                    <div class="p-6 border-b bg-slate-50 flex justify-between items-center">
+                        <h2 class="text-xl md:text-2xl font-bold text-gray-700"><i class="fa-solid fa-trash-can"></i> Corbeille</h2>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm text-gray-500">{{ trashList.length }} éléments</span>
+                            <button v-if="trashList.length > 0 && user.role==='admin'" @click="openBulkConfirm('empty_trash', 'Vider la corbeille')" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200 transition">Tout Vider</button>
+                        </div>
+                    </div>
+                    <div class="overflow-auto flex-1 p-0 pb-20 hidden md:block">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 shadow-sm font-bold">
+                                <tr><th class="p-4 w-10"><input type="checkbox" class="custom-checkbox" @change="selectAll($event)" :checked="isAllSelected && trashList.length > 0"></th><th class="p-4">Date</th><th class="p-4">Client</th><th class="p-4 hidden md:table-cell">Supprimé par</th><th class="p-4 text-right">Actions</th></tr>
+                            </thead>
+                            <tbody class="text-sm">
+                                <tr v-for="rdv in trashList" :key="rdv.id" class="border-b hover:bg-red-50 transition" :class="{'bg-red-50': selectedIds.includes(rdv.id)}">
+                                    <td class="p-4 text-center"><input type="checkbox" class="custom-checkbox" :checked="selectedIds.includes(rdv.id)" @change="toggleSelection(rdv.id)"></td>
+                                    <td class="p-4 text-gray-400"><div class="font-bold line-through">{{ formatDateShort(rdv.date) }}</div></td>
+                                    <td class="p-4 opacity-50"><div class="font-bold">{{ rdv.nom }}</div><div>{{ rdv.modele }}</div></td>
+                                    <td class="p-4 text-xs font-bold text-gray-400 uppercase hidden md:table-cell">Utilisateur</td>
+                                    <td class="p-4 text-right flex justify-end gap-2"><button @click="restoreRdv(rdv)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-green-200 transition" title="Restaurer"><i class="fa-solid fa-rotate-left"></i></button><button v-if="user.role==='admin'" @click="hardDeleteRdv(rdv)" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-200 transition" title="Supprimer définitivement"><i class="fa-solid fa-ban"></i></button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="md:hidden flex-1 overflow-y-auto p-4 space-y-3 pb-24 bg-slate-100">
+                        <div v-for="rdv in trashList" :key="rdv.id" class="bg-white p-4 rounded-2xl shadow-sm border border-red-100 relative">
+                            <div class="absolute top-4 right-4"><input type="checkbox" class="custom-checkbox" :checked="selectedIds.includes(rdv.id)" @change="toggleSelection(rdv.id)"></div>
+                            <div class="flex justify-between items-start mb-2 pr-8 opacity-60"><div><div class="text-xs font-bold text-slate-400 uppercase flex items-center gap-1 line-through"><i class="fa-regular fa-calendar"></i> {{ formatDateShort(rdv.date) }}</div><div class="text-lg font-bold text-slate-800">{{ rdv.nom }}</div></div></div>
+                            <div class="flex items-center gap-2 mb-3 text-sm text-slate-600 font-medium opacity-60"><i class="fa-solid fa-car"></i> {{ rdv.modele }}</div>
+                            <div class="flex gap-2 justify-end mt-2 pt-2 border-t"><button @click="restoreRdv(rdv)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-green-200 transition">Restaurer</button><button v-if="user.role==='admin'" @click="hardDeleteRdv(rdv)" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-200 transition">Supprimer</button></div>
+                        </div>
+                    </div>
+                    <div v-if="selectedIds.length > 0" class="absolute bottom-6 left-4 right-4 md:left-6 md:right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between slide-up z-20 gap-3"><div class="font-bold pl-2"><span class="text-blue-400 text-xl">{{ selectedIds.length }}</span> sélectionnés</div><div class="flex gap-2 w-full md:w-auto justify-end"><button @click="openBulkConfirm('restore_trash', 'Restaurer')" class="bg-green-600 hover:bg-green-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Tout Restaurer</button><button v-if="user.role==='admin'" @click="openBulkConfirm('delete_trash', 'Supprimer définitivement')" class="bg-red-600 hover:bg-red-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Tout Supprimer</button><button @click="selectedIds=[]" class="ml-2 text-gray-400 hover:text-white px-2">✕</button></div></div>
+                </div>
+                
+                <div v-if="view==='pending_status'" class="max-w-3xl mx-auto space-y-4 fade-in"><h2 class="text-xl md:text-2xl font-bold mb-6 text-purple-700"><i class="fa-solid fa-clipboard-question"></i> Statuts à définir</h2><div v-if="pendingStatusList.length===0" class="bg-white p-10 rounded-2xl text-center text-gray-400 border border-slate-100 shadow-sm"><i class="fa-solid fa-check-circle text-4xl mb-2 text-green-500"></i><br>Tous les statuts sont à jour !</div><div v-for="r in pendingStatusList" :key="r.id" class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-4 border-purple-500 flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md transition group" @click="openRdvFiche(r)"><div class="cursor-pointer flex-1"><div class="font-bold text-lg flex items-center gap-2">{{ r.civilite }} {{ r.nom }} <span class="text-xs bg-gray-100 text-gray-500 px-2 rounded">Terminé</span></div><div class="text-slate-500">{{ formatDateFr(r.date) }} à {{ r.heure }} • {{ r.modele }}</div><div class="text-sm font-bold text-blue-600 mt-1">{{ getAgenceName(r.agenceId) }}</div></div><div class="flex gap-2 w-full md:w-auto"><button @click.stop="updateStatus(r, 'honor_fact')" class="flex-1 md:flex-none bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold hover:bg-green-200 border border-green-200 text-sm"><i class="fa-solid fa-check"></i> Honoré</button><button @click.stop="updateStatus(r, 'noshow')" class="flex-1 md:flex-none bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold hover:bg-red-200 border border-red-200 text-sm"><i class="fa-solid fa-user-xmark"></i> Lapin</button></div></div></div>
+                <div v-if="view==='rappels' || view==='confirmations'" class="max-w-3xl mx-auto space-y-4 fade-in"><h2 class="text-xl md:text-2xl font-bold mb-6" :class="view==='rappels'?'text-red-600':'text-orange-600'">{{ view==='rappels' ? 'Rappels à effectuer' : 'Rendez-vous à confirmer' }}</h2><div v-if="(view==='rappels' && rappelsList.length===0) || (view==='confirmations' && confirmList.length===0)" class="bg-white p-10 rounded-2xl text-center text-gray-400 border border-slate-100 shadow-sm"><i class="fa-solid fa-check-circle text-4xl mb-2 text-green-500"></i><br>Tout est à jour !</div><div v-for="r in (view==='rappels'?rappelsList:confirmList)" :key="r.id" class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-4 flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md transition gap-4" :class="view==='rappels'?'border-red-500':'border-orange-500'"><div><div class="font-bold text-lg">{{ r.civilite }} {{ r.nom }}</div><div class="text-slate-500">{{ formatDateFr(r.date) }} à {{ r.heure }} • {{ r.modele }}</div><div class="text-sm font-bold text-blue-600 mt-1">{{ getAgenceName(r.agenceId) }}</div></div><div class="flex flex-wrap gap-2 w-full md:w-auto"><a :href="generateMsgLink(r, view==='rappels' ? getRappelType(r) : 'confirm')" target="_blank" class="flex-1 md:flex-none justify-center bg-slate-800 text-white px-4 py-2 rounded-xl font-bold hover:bg-slate-900 flex items-center gap-2 shadow-lg shadow-slate-200"><i class="fa-solid fa-comment-sms"></i> {{ view==='rappels' ? getRappelLabel(r) : 'SMS' }}</a><button @click="validateAction(r, view)" class="bg-green-500 text-white px-4 py-2 rounded-xl font-bold hover:bg-green-600 shadow"><i class="fa-solid fa-check"></i></button><button v-if="view==='confirmations'" @click.stop="quickCancel(r)" class="bg-white text-red-500 border border-red-200 px-4 py-2 rounded-xl font-bold hover:bg-red-50"><i class="fa-solid fa-xmark"></i></button></div></div></div>
+            </div>
+        </main>
+    </div>
+
+    <div v-if="clientModal.open" class="fixed inset-0 bg-slate-900/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-lg md:max-w-2xl rounded-[32px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] pop-in relative">
+            <div v-if="getRdvTimeStatus(clientModal.rdv) === 'en_cours'" class="bg-green-500 text-white text-center py-1 font-bold text-xs uppercase tracking-widest animate-pulse shadow-lg">⚡ En Cours ⚡</div>
+            <div v-else-if="getRdvTimeStatus(clientModal.rdv) === 'bientot'" class="bg-orange-400 text-white text-center py-1 font-bold text-xs uppercase tracking-widest">⚠️ Arrive bientôt</div>
+            <div class="bg-gradient-to-r from-slate-800 to-slate-900 p-6 md:p-8 text-white relative">
+                <button @click="clientModal.open=false" class="absolute top-4 right-4 md:top-6 md:right-6 w-10 h-10 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center transition backdrop-blur-sm">✕</button>
+                <div class="flex flex-col md:flex-row gap-6 items-center md:items-start text-center md:text-left">
+                    <div :class="{'live-pulse border-green-400': getRdvTimeStatus(clientModal.rdv)==='en_cours'}" class="w-16 h-16 md:w-20 md:h-20 bg-white/10 border border-white/20 rounded-3xl flex items-center justify-center text-3xl font-bold backdrop-blur-sm shadow-xl transition-all duration-500">{{ clientModal.rdv.civilite === 'M.' ? 'M' : 'F' }}</div>
+                    <div class="flex-1 w-full">
+                        <input v-model="clientModal.rdv.nom" class="bg-transparent text-2xl md:text-3xl font-bold text-white placeholder-white/40 w-full outline-none border-b border-transparent focus:border-white/30 p-0 text-center md:text-left">
+                        <input type="tel" inputmode="numeric" pattern="[0-9]*" :value="clientModal.rdv.telephone" @input="onModalPhoneInput" class="bg-transparent text-blue-300 font-mono text-lg md:text-xl w-full outline-none opacity-90 mt-1 text-center md:text-left">
+                        <div class="flex gap-3 mt-4 justify-center md:justify-start">
+                            <a :href="'tel:' + normalizePhone(clientModal.rdv.telephone)" class="bg-green-500 hover:bg-green-600 text-white rounded-xl px-4 py-2 font-bold flex items-center gap-2 shadow-lg transform active:scale-95 transition text-sm"><i class="fa-solid fa-phone"></i> Appeler</a>
+                            <a :href="generateMsgLink(clientModal.rdv, 'confirm')" target="_blank" class="bg-blue-500 hover:bg-blue-600 text-white rounded-xl px-4 py-2 font-bold flex items-center gap-2 shadow-lg transform active:scale-95 transition text-sm"><i class="fa-solid fa-paper-plane"></i> SMS</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 space-y-4 md:space-y-6">
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <span :class="statusClass(clientModal.rdv.statut)" class="px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wide">{{ displayStatus(clientModal.rdv) }}</span>
+                    </div>
+                    <div class="text-xs md:text-sm font-bold">{{ getAgenceName(clientModal.rdv.agenceId) }}</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Véhicule</label>
+                        <input v-model="clientModal.rdv.modele" class="w-full text-lg font-bold text-slate-800 outline-none placeholder-slate-300">
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Source</label>
+                        <div class="flex items-center gap-2">
+                            <img v-if="clientModal.rdv.source" :src="getLogo(clientModal.rdv.source)" class="w-5 h-5 rounded">
+                            <span class="font-bold text-slate-700">{{ clientModal.rdv.source }}</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
+                    <div>
+                        <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Date & Heure du RDV</label>
+                        <div class="text-xl font-bold text-slate-800">{{ formatDateFr(clientModal.rdv.date) }} à {{ clientModal.rdv.heure }}</div>
+                    </div>
+                    <button @click="openRescheduleModal(clientModal.rdv)" class="w-full md:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-xl font-bold text-sm transition">📅 Modifier Date/Heure</button>
+                </div>
+                
+                <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Notes & Historique</label>
+                    
+                    <div class="space-y-3 mb-4 max-h-[200px] overflow-y-auto">
+                        <div v-if="clientModal.rdv.note && (!clientModal.rdv.notes || clientModal.rdv.notes.length === 0)" class="bg-yellow-50 p-3 rounded-xl text-sm text-slate-700 italic border border-yellow-100">
+                            {{ clientModal.rdv.note }} <span class="text-xs text-yellow-400 block mt-1">(Ancienne note)</span>
+                        </div>
+                        <div v-for="(n, idx) in clientModal.rdv.notes" :key="idx" class="bg-blue-50 p-3 rounded-xl border border-blue-100 text-sm">
+                            <div class="flex justify-between items-start mb-1">
+                                <span class="font-bold text-blue-800 text-xs">{{ n.author }}</span>
+                                <span class="text-[10px] text-blue-400">{{ formatDateFr(n.date) }}</span>
+                            </div>
+                            <div class="text-slate-700">{{ n.text }}</div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <input v-model="newNoteText" @keyup.enter="addNote" placeholder="Ajouter une note..." class="flex-1 bg-slate-50 p-3 rounded-xl text-sm border border-slate-200 outline-none focus:border-blue-500">
+                        <button @click="addNote" class="bg-blue-600 text-white w-10 h-10 rounded-xl flex items-center justify-center hover:bg-blue-700"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="bg-slate-100 p-4 rounded-2xl">
+                        <div class="flex gap-2 mb-2">
+                            <button @click="updateStatus(clientModal.rdv, 'honor_fact')" class="flex-1 bg-white border border-green-200 text-green-700 py-2 rounded-lg text-xs font-bold shadow-sm">Honoré</button>
+                            <button @click="updateStatus(clientModal.rdv, 'noshow')" class="flex-1 bg-white border border-red-200 text-red-600 py-2 rounded-lg text-xs font-bold shadow-sm">Lapin</button>
+                        </div>
+                        <button v-if="['honore','pas_venu','annule'].includes(clientModal.rdv.statut)" @click="updateStatus(clientModal.rdv, 'reset')" class="w-full bg-slate-200 text-slate-600 py-2 rounded-lg text-xs font-bold shadow-sm hover:bg-slate-300 transition"><i class="fa-solid fa-rotate-left"></i> Réinitialiser le statut</button>
+                        
+                        <div class="mt-4 border-t pt-4">
+                            <button @click="showDiscountInput = !showDiscountInput" :class="showDiscountInput ? 'bg-red-100 text-red-600' : 'bg-white text-slate-600'" class="w-full py-3 rounded-xl font-bold text-sm shadow-sm border-2 border-slate-200 flex items-center justify-center gap-2 transition hover:bg-red-50 hover:border-red-200">
+                                <i class="fa-solid fa-gift text-xl"></i> {{ showDiscountInput ? 'Masquer Geste Commercial' : 'Faire un geste commercial' }}
+                            </button>
+
+                            <div v-if="showDiscountInput || clientModal.rdv.geste_commercial" class="mt-3 flex flex-col gap-2 animate-fadeIn bg-white p-3 rounded-xl border border-red-100">
+                                <div class="flex items-center gap-4">
+                                    <label class="text-xs font-bold text-red-400 uppercase whitespace-nowrap">Montant (€)</label>
+                                    <input v-model.number="clientModal.rdv.geste_commercial" type="number" class="w-full p-2 border-2 border-red-100 rounded-lg font-bold text-red-600 text-center outline-none focus:border-red-300" placeholder="0">
+                                </div>
+                                <input v-model="clientModal.rdv.motif_geste" type="text" class="w-full p-2 border-2 border-red-100 rounded-lg font-bold text-slate-600 text-center outline-none focus:border-red-300" placeholder="Motif (ex: retard, sympa...)">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-4">
+                        <button @click="softDeleteRdv(clientModal.rdv)" class="bg-gray-200 text-gray-500 py-3 rounded-xl font-bold px-4 md:hidden"><i class="fa-solid fa-trash-can"></i></button>
+                        <button @click="openCancelChoice(clientModal.rdv)" class="w-full bg-red-50 text-red-700 py-3 rounded-xl font-bold hover:bg-red-100 transition">Annuler le RDV</button>
+                    </div>
+                </div>
+            </div>
+            <div class="p-6 bg-white border-t flex justify-between items-center">
+                <div class="text-[10px] text-gray-400 font-bold hidden md:block">
+                    <div v-if="clientModal.rdv.created">Créé le {{ formatDateFr(clientModal.rdv.created) }}</div>
+                    <div v-if="clientModal.rdv.createdBy">Par {{ clientModal.rdv.createdBy }}</div>
+                </div>
+                <button @click="updateRdv(clientModal.rdv)" class="w-full md:w-auto bg-slate-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-slate-800 shadow-xl transition transform active:scale-95">Enregistrer</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="settingsModal.open" class="fixed inset-0 bg-slate-900/80 z-[150] flex items-center justify-center p-4 backdrop-blur-sm">
+        <div class="bg-white w-full max-w-4xl h-[90vh] md:h-[80vh] rounded-3xl shadow-2xl overflow-hidden flex flex-col fade-in">
+            <div class="flex bg-slate-100 p-2 gap-2 border-b overflow-x-auto hide-scrollbar">
+                <button @click="settingsModal.tab='Agences'" :class="settingsModal.tab==='Agences'?'bg-white shadow text-blue-600':'text-gray-500 hover:bg-white/50'" class="px-4 md:px-6 py-3 rounded-xl font-bold transition flex-shrink-0 whitespace-nowrap">🏢 Agences</button>
+                <button @click="settingsModal.tab='Equipe'" :class="settingsModal.tab==='Equipe'?'bg-white shadow text-blue-600':'text-gray-500 hover:bg-white/50'" class="px-4 md:px-6 py-3 rounded-xl font-bold transition flex-shrink-0 whitespace-nowrap">👥 Équipe</button>
+                <button @click="settingsModal.tab='Admins'" :class="settingsModal.tab==='Admins'?'bg-white shadow text-blue-600':'text-gray-500 hover:bg-white/50'" class="px-4 md:px-6 py-3 rounded-xl font-bold transition flex-shrink-0 whitespace-nowrap">👑 Admins</button>
+                <button @click="settingsModal.tab='Messages'" :class="settingsModal.tab==='Messages'?'bg-white shadow text-blue-600':'text-gray-500 hover:bg-white/50'" class="px-4 md:px-6 py-3 rounded-xl font-bold transition flex-shrink-0 whitespace-nowrap">💬 SMS</button>
+                <button @click="settingsModal.tab='Sources'" :class="settingsModal.tab==='Sources'?'bg-white shadow text-blue-600':'text-gray-500 hover:bg-white/50'" class="px-4 md:px-6 py-3 rounded-xl font-bold transition flex-shrink-0 whitespace-nowrap">🔗 Sources</button>
+                <button @click="settingsModal.open=false" class="w-12 flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 rounded-xl transition ml-auto flex-shrink-0">✕</button>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
+                
+                <div v-if="settingsModal.tab==='Equipe'" class="space-y-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-lg mb-4 text-slate-700">Ajouter un Prospecteur</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <input v-model="newMember.name" placeholder="Nom / Prénom" class="p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50">
+                            <input v-model="newMember.email" placeholder="Identifiant / Email" class="p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50">
+                            <input v-model="newMember.password" placeholder="Mot de passe" class="p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50">
+                            <button @click="addTeamMember" :disabled="!newMember.name || !newMember.email || !newMember.password" class="bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition">Ajouter</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-slate-100 text-slate-500 text-xs uppercase font-bold"><tr><th class="p-4">Nom</th><th class="p-4">Identifiant</th><th class="p-4 hidden md:table-cell">Statut</th><th class="p-4 text-right">Actions</th></tr></thead>
+                            <tbody class="divide-y"><tr v-for="member in teamList" :key="member.id" class="hover:bg-slate-50 transition"><td class="p-4 font-bold">{{ member.name }}</td><td class="p-4 text-blue-600 font-medium text-xs md:text-sm">{{ member.email }}</td><td class="p-4 hidden md:table-cell"><span v-if="member.blocked" class="bg-red-100 text-red-600 px-3 py-1 rounded-full text-xs font-bold uppercase">Bloqué</span><span v-else class="bg-green-100 text-green-600 px-3 py-1 rounded-full text-xs font-bold uppercase">Actif</span></td><td class="p-4 text-right space-x-2"><button @click="toggleBlockTeamMember(member)" :class="member.blocked ? 'bg-green-100 text-green-600 hover:bg-green-200' : 'bg-orange-100 text-orange-600 hover:bg-orange-200'" class="px-3 py-1.5 rounded-lg font-bold text-xs transition">{{ member.blocked ? 'Débloquer' : 'Bloquer' }}</button><button @click="deleteTeamMember(member)" class="bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1.5 rounded-lg font-bold text-xs transition"><i class="fa-solid fa-trash"></i></button></td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div v-if="settingsModal.tab==='Agences'" class="space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div @click="openAgencyEdit(null)" class="border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center p-6 text-gray-400 hover:border-blue-500 hover:text-blue-500 hover:bg-blue-50 cursor-pointer transition min-h-[150px]"><i class="fa-solid fa-plus text-4xl mb-2"></i><span class="font-bold">Ajouter Agence</span></div>
+                        <div v-for="ag in agences" :key="ag.id" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:border-blue-400 transition relative group">
+                            <div class="flex justify-between items-start mb-2"><h3 class="font-bold text-xl">{{ ag.nom }}</h3><div class="flex gap-2 opacity-100 md:opacity-0 group-hover:opacity-100 transition"><button @click.stop="openAgencyEdit(ag)" class="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 hover:bg-blue-200"><i class="fa-solid fa-pen"></i></button><button @click.stop="deleteAgency(ag.id)" class="w-8 h-8 rounded-lg bg-red-100 text-red-600 hover:bg-red-200"><i class="fa-solid fa-trash"></i></button></div></div>
+                            <p class="text-sm text-gray-500 mb-4 h-10 overflow-hidden">{{ ag.adresse }}</p>
+                            <div class="flex justify-between items-center mt-auto pt-4 border-t"><span class="font-bold text-lg text-slate-700">{{ formatPrice(ag.prix) }} <span class="text-[10px] text-gray-400 uppercase">{{ ag.tva ? 'TTC' : 'HT' }}</span></span><span :class="ag.statut_activite==='pause'?'bg-red-100 text-red-600':'bg-green-100 text-green-600'" class="px-2 py-1 rounded text-xs font-bold uppercase">{{ ag.statut_activite === 'pause' ? 'Pause' : 'Actif' }}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="settingsModal.tab==='Admins'" class="space-y-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-lg mb-4 text-slate-700">Gérer les Noms d'Administrateurs</h3>
+                        <div class="flex gap-2 mb-6">
+                            <input v-model="newAdminName" placeholder="Nouveau prénom (ex: Charlène)" class="flex-1 p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50">
+                            <button @click="addAdminName" class="bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700">Ajouter</button>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div v-for="name in adminNamesList" :key="name" class="flex items-center justify-between p-3 border rounded-xl bg-white hover:border-blue-300 transition group">
+                                <span class="font-bold text-slate-700 ml-2">{{ name }}</span>
+                                <button @click="removeAdminName(name)" class="text-gray-300 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-4 italic">Ces noms seront proposés lors de la connexion avec le compte Administrateur.</p>
+                    </div>
+                </div>
+                
+                <div v-if="settingsModal.tab==='Messages'" class="grid grid-cols-1 lg:grid-cols-3 gap-6 h-full overflow-hidden flex flex-col lg:grid">
+                    <div class="lg:col-span-1 border-r lg:pr-6 space-y-4 overflow-y-auto max-h-[200px] lg:max-h-full">
+                        <h3 class="font-bold text-gray-500 uppercase text-xs tracking-wider mb-2">1. Choisir l'Agence</h3>
+                        <div class="space-y-2"><button v-for="ag in agences" @click="editingMsgAgence = ag" :class="editingMsgAgence?.id === ag.id ? 'bg-blue-600 text-white shadow-md' : 'bg-white hover:bg-slate-100 text-slate-700'" class="w-full text-left px-4 py-3 rounded-xl font-bold transition text-sm flex items-center justify-between"><span>{{ ag.nom }}</span><i v-if="editingMsgAgence?.id === ag.id" class="fa-solid fa-chevron-right"></i></button></div>
+                        <h3 class="font-bold text-gray-500 uppercase text-xs tracking-wider mt-6 mb-2">2. Type de Message</h3>
+                        <div class="space-y-2"><button v-for="(label, key) in msgLabels" :key="key" @click="editingMsgType = key" :class="editingMsgType === key ? 'bg-slate-800 text-white shadow-md' : 'bg-white border hover:bg-slate-50 text-slate-600'" class="w-full text-left px-4 py-2 rounded-lg font-bold transition text-xs flex justify-between"><span>{{ label }}</span></button></div>
+                    </div>
+                    <div class="lg:col-span-2 flex flex-col h-full overflow-y-auto">
+                        <div v-if="editingMsgAgence" class="flex-1 flex flex-col">
+                            <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-lg text-blue-900 leading-tight">Éditer : {{ msgLabels[editingMsgType] }} <span class="text-gray-400 text-sm font-normal block md:inline">({{ editingMsgAgence.nom }})</span></h3><button @click="saveAgency(editingMsgAgence)" class="bg-green-500 hover:bg-green-600 text-white px-4 md:px-6 py-2 rounded-lg font-bold transition shadow-md text-sm">Enregistrer</button></div>
+                            <div class="flex flex-wrap gap-2 mb-2 p-3 bg-slate-100 rounded-xl border border-slate-200"><button v-for="tag in ['{{NOM}}','{{DATE_LONG}}','{{HEURE}}','{{AGENCE}}','{{ADRESSE}}','{{PRIX}}','{{PLAN}}']" @click="insertTag(tag)" class="bg-white border border-slate-300 text-slate-600 px-2 py-1 rounded text-[10px] font-bold hover:bg-blue-50 hover:border-blue-300 transition">{{ tag }}</button></div>
+                            <textarea :value="editingMsgAgence.templates?.[editingMsgType] || getDefaultTemplate(editingMsgType)" @input="e => { if(!editingMsgAgence.templates) editingMsgAgence.templates={}; editingMsgAgence.templates[editingMsgType] = e.target.value }" class="w-full flex-1 p-4 border-2 border-slate-200 rounded-2xl outline-none focus:border-blue-500 font-medium text-slate-700 leading-relaxed resize-none bg-slate-50 focus:bg-white transition min-h-[200px]"></textarea>
+                        </div>
+                        <div v-else class="flex-1 flex items-center justify-center text-center text-gray-400 border-2 border-dashed border-gray-200 rounded-2xl p-8">Sélectionnez une agence.</div>
+                    </div>
+                </div>
+
+                <div v-if="settingsModal.tab==='Sources'" class="space-y-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-lg mb-4 text-slate-700">Gérer les Sources</h3>
+                        <div class="flex gap-2 mb-6"><input v-model="newSource" placeholder="Nouvelle source..." class="flex-1 p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50"><button @click="addSource" class="bg-blue-600 text-white px-6 rounded-xl font-bold hover:bg-blue-700">Ajouter</button></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div v-for="src in sourcesList" :key="src" class="flex items-center justify-between p-3 border rounded-xl bg-white hover:border-blue-300 transition group"><div class="flex items-center gap-3"><img :src="getLogo(src)" class="w-6 h-6 rounded bg-gray-50 object-contain cursor-pointer hover:opacity-80" @click="changeSourceLogo(src)" title="Changer le logo"><span class="font-bold text-slate-700">{{ src }}</span></div><button @click="removeSource(src)" class="text-gray-300 hover:text-red-500 transition"><i class="fa-solid fa-trash"></i></button></div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    
+    <div v-if="editingAgency" class="fixed inset-0 bg-slate-900/80 z-[200] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl p-6 fade-in max-h-[90vh] overflow-y-auto"><h3 class="font-bold text-xl mb-6 text-slate-800">{{ editingAgency.id ? 'Modifier' : 'Nouvelle' }} Agence</h3><div class="space-y-4"><div><label class="text-xs font-bold text-gray-500 uppercase">Nom</label><input v-model="editingAgency.nom" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50 font-bold"></div><div><label class="text-xs font-bold text-gray-500 uppercase">Adresse Postale</label><input v-model="editingAgency.adresse" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50"></div><div><label class="text-xs font-bold text-gray-500 uppercase">Lien Google Maps (Short)</label><input v-model="editingAgency.maps" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50 text-blue-600"></div><div><label class="text-xs font-bold text-gray-500 uppercase">Phrase d'accroche (SMS)</label><input v-model="editingAgency.tagline" placeholder="Ex: votre expert rachat" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50"></div><div class="grid grid-cols-2 gap-4"><div><label class="text-xs font-bold text-gray-500 uppercase">Prix HT (€)</label><input type="number" v-model="editingAgency.prix_ht" @input="calculateTTC" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50"></div><div><label class="text-xs font-bold text-gray-500 uppercase">TVA (%)</label><input type="number" v-model="editingAgency.tva_taux" @input="calculateTTC" placeholder="20" class="w-full p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50"></div></div><div class="flex items-center justify-between p-3 bg-slate-100 rounded-xl"><span class="font-bold text-slate-700">Prix Affiché (TTC)</span><span class="text-xl font-black text-blue-600">{{ formatPrice(editingAgency.prix) }}</span></div><div><label class="flex items-center gap-2 font-bold text-slate-700 cursor-pointer"><input type="checkbox" v-model="editingAgency.tva" class="custom-checkbox"> <span>Afficher "TTC" dans les SMS</span></label></div><div class="pt-4 border-t"><label class="text-xs font-bold text-gray-500 uppercase mb-2 block">État de l'agence</label><div class="flex gap-2"><button @click="editingAgency.statut_activite='actif'" :class="editingAgency.statut_activite==='actif' ? 'bg-green-500 text-white shadow-md' : 'bg-slate-100 text-slate-500'" class="flex-1 py-2 rounded-xl font-bold transition">Actif</button><button @click="editingAgency.statut_activite='pause'" :class="editingAgency.statut_activite==='pause' ? 'bg-red-500 text-white shadow-md' : 'bg-slate-100 text-slate-500'" class="flex-1 py-2 rounded-xl font-bold transition">En Pause</button></div></div><div v-if="editingAgency.statut_activite==='pause'" class="space-y-3 bg-red-50 p-4 rounded-xl border border-red-100 animate-fadeIn"><div><label class="text-xs font-bold text-red-500 uppercase">Motif de la pause</label><select v-model="pauseReasonSelect" @change="updatePauseReason" class="w-full p-2 border border-red-200 rounded-lg outline-none bg-white font-bold text-slate-700 mt-1"><option value="Vacances">Vacances</option><option value="Complet">Complet / Surchargé</option><option value="Travaux">Travaux</option><option value="Autre">Autre (personnalisé)</option></select><input v-if="pauseReasonSelect==='Autre'" v-model="editingAgency.motif_pause" placeholder="Précisez le motif..." class="w-full mt-2 p-2 border border-red-200 rounded-lg outline-none bg-white"></div><div v-if="pauseReasonSelect==='Vacances'" class="grid grid-cols-2 gap-2"><div><label class="text-[10px] font-bold text-red-400 uppercase">Début</label><input type="date" v-model="editingAgency.date_pause_debut" class="w-full p-2 border border-red-200 rounded-lg bg-white text-sm"></div><div><label class="text-[10px] font-bold text-red-400 uppercase">Fin (inclus)</label><input type="date" v-model="editingAgency.date_pause_fin" class="w-full p-2 border border-red-200 rounded-lg bg-white text-sm"></div></div></div></div><div class="flex gap-4 mt-6"><button @click="editingAgency=null" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300">Annuler</button><button @click="saveEditingAgency" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Enregistrer</button></div></div></div>
+    <div v-if="wizard.open" class="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] fade-in"><div class="bg-slate-50 p-4 flex justify-between items-center border-b"><h3 class="font-bold text-lg">Nouveau Rendez-Vous</h3><button @click="wizard.open=false" class="w-8 h-8 rounded-full hover:bg-slate-200">✕</button></div><div class="p-6 overflow-y-auto space-y-6"><div v-if="wizard.step===1"><h4 class="text-center font-bold text-xl mb-4">Choisir l'agence</h4><div class="mb-4 relative"><i class="fa-solid fa-search absolute left-3 top-3.5 text-gray-400"></i><input v-model="agencySearch" placeholder="Rechercher une agence..." class="w-full pl-10 p-3 border rounded-xl outline-none focus:border-blue-500 bg-slate-50 font-bold"></div><div class="grid grid-cols-1 gap-3 max-h-[50vh] overflow-y-auto"><button v-for="ag in filteredAgences" @click="checkAgenceAndProceed(ag)" :class="ag.statut_activite==='pause' ? 'border-red-200 bg-red-50 hover:bg-red-100' : 'border-slate-200 hover:border-blue-500 hover:bg-blue-50'" class="p-4 border-2 rounded-xl text-left transition group relative flex flex-col justify-center min-h-[80px]"><div class="font-bold text-lg leading-tight text-slate-800 group-hover:text-blue-600 mb-1">{{ ag.nom }}</div><div class="text-[10px] text-gray-400 truncate opacity-70 group-hover:opacity-100">{{ ag.adresse }}</div><div v-if="ag.statut_activite==='pause'" class="absolute top-2 right-2 text-red-500 bg-white rounded-full px-1.5 py-0.5 text-[10px] font-bold shadow-sm border border-red-100"><i class="fa-solid fa-pause"></i></div></button><div v-if="filteredAgences.length === 0" class="col-span-1 text-center text-gray-400 py-4 italic">Aucune agence trouvée.</div></div></div><div v-if="wizard.step===2"><h4 class="text-center font-bold text-xl mb-4">Client</h4><div class="flex justify-center gap-4 mb-4"><button @click="form.civilite='M.'" :class="form.civilite==='M.'?'bg-blue-600 text-white':'bg-gray-100'" class="px-6 py-2 rounded-full font-bold">Monsieur</button><button @click="form.civilite='Mme'" :class="form.civilite==='Mme'?'bg-pink-500 text-white':'bg-gray-100'" class="px-6 py-2 rounded-full font-bold">Madame</button></div><div class="mb-4"><input v-model="form.nom" placeholder="Nom ou Prénom" class="w-full text-center text-lg border-b-2 p-2 outline-none focus:border-blue-600"></div><div class="relative"><input type="tel" inputmode="numeric" pattern="[0-9]*" :value="form.telephone" @input="onWizardPhoneInput" placeholder="06 12 34 56 78" class="w-full text-center text-2xl font-mono border-b-2 p-2 outline-none focus:border-blue-600 tracking-[0.3em] bg-transparent"><p v-if="clientExists" class="text-green-600 text-xs text-center mt-2 font-bold animate-pulse">✨ Client existant détecté ! Infos remplies.</p></div><div class="flex gap-2 mt-6"><button @click="wizard.step--" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300">Retour</button><button @click="wizard.step++" :disabled="!form.nom || normalizePhone(form.telephone).length<10" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold disabled:opacity-50">Suivant</button></div></div><div v-if="wizard.step===3" class="flex flex-col h-full"><h4 class="text-center font-bold text-xl mb-4 text-slate-800">Date & Heure du RDV</h4><div class="mb-4"><div class="flex items-center justify-between mb-2"><h5 class="text-xs font-black uppercase text-slate-500 tracking-wider"><i class="fa-solid fa-calendar-alt text-blue-500"></i> Choisir le Jour :</h5><input type="date" v-model="form.date" @change="form.heure=null" class="p-1 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-500 shadow-sm cursor-pointer hover:bg-blue-50"></div><div class="overflow-x-auto pb-2 hide-scrollbar snap-x flex space-x-2"><button v-for="d in dateOptions" :key="d.val" @click="form.date=d.val; form.heure=null;" :class="[form.date===d.val ? 'bg-blue-600 text-white shadow-lg transform scale-[1.05] date-card-selected' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-400', d.isToday ? 'border-2 border-green-500 shadow-md' : '']" class="flex-shrink-0 w-16 h-20 rounded-lg flex flex-col items-center justify-center text-sm transition-all duration-300 snap-center date-card p-1"><span :class="form.date===d.val ? 'text-blue-200' : 'text-slate-400'" class="text-[9px] font-bold uppercase mb-0 transition-colors">{{ d.dayName }}</span><span class="text-2xl font-black leading-none">{{ d.dayNum }}</span><span class="text-[9px] font-medium opacity-80 mt-1">{{ d.month }}</span></button></div></div><div v-if="form.date" class="overflow-y-auto hide-scrollbar flex-1 p-2 border border-slate-100 rounded-lg bg-white shadow-inner animate-fadeIn max-h-[300px]"><h5 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-2"><i class="fa-solid fa-clock text-green-500"></i> Choisir l'Heure (09:00 à 18:00) :</h5><div class="space-y-3"><div class="grid grid-cols-4 gap-2"><button v-for="h in timeSlots" :key="h" @click="form.heure=h" :class="form.heure===h ? 'bg-green-500 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-green-50'" class="py-1.5 rounded-md text-xs font-bold transition-all duration-200">{{ h }}</button></div><div class="pt-2 flex justify-center border-t border-slate-100"><input type="time" v-model="form.heure" class="border-2 border-blue-100 rounded-lg p-2 font-bold text-blue-900 text-center text-sm outline-none focus:border-blue-500 bg-blue-50 w-32"></div></div></div><div v-else class="flex-1 flex items-center justify-center text-center text-gray-400 border border-dashed border-gray-200 rounded-2xl"><p class="text-sm font-medium p-8">📅 Veuillez d'abord sélectionner une date ci-dessus.</p></div><div class="mt-4 flex gap-2"><button @click="wizard.step--" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300">Retour</button><button @click="wizard.step++" :disabled="!form.date || !form.heure" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md flex items-center justify-center gap-2 transition transform active:scale-95 disabled:opacity-50">Suivant <i class="fa-solid fa-arrow-right"></i></button></div></div><div v-if="wizard.step===4"><h4 class="text-center font-bold text-xl mb-4">Détails</h4><input v-model="form.modele" placeholder="Véhicule (ex: Clio 4)" class="w-full text-center text-xl border-b-2 p-2 outline-none mb-6 focus:border-blue-600"><p class="text-xs font-bold text-gray-400 mb-2 text-center">SOURCE</p><div class="flex flex-wrap justify-center gap-3"><button v-for="src in sourcesList" @click="selectSource(src)" :class="form.source === src ? 'border-blue-500 bg-blue-100 shadow-md' : 'border-slate-200 bg-white shadow-sm'" class="px-4 py-2 rounded-full border hover:bg-blue-50 flex items-center gap-2 transition"><img :src="getLogo(src)" class="w-5 h-5 rounded"> {{ src }}</button></div><div class="flex gap-2 mt-6"><button @click="wizard.step--" class="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300">Retour</button><button @click="wizard.step++" :disabled="!form.modele || !form.source" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-bold disabled:opacity-50">Suivant</button></div></div><div v-if="wizard.step===5"><h4 class="text-center font-bold text-xl mb-4 text-blue-900">Récapitulatif</h4><div class="bg-slate-50 p-4 rounded-xl space-y-2 text-sm border border-slate-200"><div class="flex justify-between"><span>Client</span> <b>{{ form.civilite }} {{ form.nom }}</b></div><div class="flex justify-between"><span>Tel</span> <b>{{ form.telephone }}</b></div><div class="flex justify-between"><span>Date</span> <b>{{ formatDateFr(form.date) }} à {{ form.heure }}</b></div><div class="flex justify-between"><span>Véhicule</span> <b>{{ form.modele }}</b></div><div class="flex justify-between"><span>Agence</span> <b>{{ form.agence.nom }}</b></div><div v-if="user.role==='admin'" class="flex justify-between pt-2 border-t mt-2"><span>Prix estimé</span> <b :class="form.agence.tva ? 'text-blue-600' : 'text-gray-600'">{{ formatPrice(form.agence.prix) }} {{ form.agence.tva ? 'TTC' : 'HT' }}</b></div></div><div class="grid grid-cols-2 gap-2 mt-4"><button @click="wizard.step--" class="bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300">Retour</button><button @click="finalizeRdv('a_confirmer')" class="bg-orange-100 text-orange-700 py-3 rounded-xl font-bold hover:bg-orange-200">Confirmer + Tard</button></div><a :href="generateMsgLink(form, 'confirm')" @click="finalizeRdv('confirme')" target="_blank" class="block w-full bg-green-500 text-white py-4 rounded-2xl font-bold text-center shadow-xl hover:bg-green-600 mt-2 flex items-center justify-center gap-2"><i class="fa-solid fa-paper-plane"></i> SMS & Valider</a></div></div></div></div>
+    <div v-if="cancelModal.open" class="fixed inset-0 bg-slate-900/60 z-[160] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm text-center"><h3 class="font-bold text-lg mb-4">Qui a annulé ?</h3><div class="space-y-3"><a :href="generateLink(cancelModal.rdv, 'cancel_clt')" target="_blank" @click="confirmCancel(cancelModal.rdv, 'client')" class="block w-full bg-slate-100 hover:bg-slate-200 py-3 rounded-xl font-bold text-slate-700 transition">Le Client</a><a :href="generateLink(cancelModal.rdv, 'cancel_ag')" target="_blank" @click="confirmCancel(cancelModal.rdv, 'agence')" class="block w-full bg-slate-100 hover:bg-slate-200 py-3 rounded-xl font-bold text-slate-700 transition">L'Agence</a><button @click="cancelModal.open=false" class="block w-full mt-4 text-gray-400 hover:text-gray-600 text-sm font-bold">Retour</button></div></div></div>
+    <div v-if="pausedAgencyModal.open" class="fixed inset-0 bg-slate-900/60 z-[200] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-sm text-center animate-shake border-4 border-red-100"><div class="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl"><i class="fa-solid fa-ban"></i></div><h3 class="font-bold text-xl mb-2 text-slate-800">Agence Indisponible</h3><p class="text-slate-600 mb-6 font-medium">{{ getPauseMessage(pausedAgencyModal.agency) }}</p><button @click="pausedAgencyModal.open=false" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-900 transition">Compris</button></div></div>
+    <div v-if="rescheduleModal.open" class="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm"><div class="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] fade-in"><div class="bg-slate-50 p-4 flex justify-between items-center border-b"><h3 class="font-bold text-lg text-slate-800">📅 Reporter Rendez-Vous</h3><button @click="rescheduleModal.open=false" class="w-8 h-8 rounded-full hover:bg-slate-200">✕</button></div><div v-if="rescheduleModal.step===1" class="p-6 overflow-y-auto space-y-4"><p class="text-sm font-bold text-blue-600 text-center mb-4">RDV Actuel: {{ formatDateFr(rescheduleModal.rdv.date) }} à {{ rescheduleModal.rdv.heure }}</p><div class="mb-4"><div class="flex items-center justify-between mb-2"><h5 class="text-xs font-black uppercase text-slate-500 tracking-wider"><i class="fa-solid fa-calendar-alt text-blue-500"></i> Choisir le Nouveau Jour :</h5><input type="date" v-model="rescheduleModal.date" @change="rescheduleModal.heure=null" class="p-1 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 outline-none focus:border-blue-500 shadow-sm cursor-pointer hover:bg-blue-50"></div><div class="overflow-x-auto pb-2 hide-scrollbar snap-x flex space-x-2"><button v-for="d in dateOptions" :key="d.val" @click="rescheduleModal.date=d.val; rescheduleModal.heure=null;" :class="[rescheduleModal.date===d.val ? 'bg-blue-600 text-white shadow-lg transform scale-[1.05] date-card-selected' : 'bg-white border-gray-200 text-gray-600 hover:border-blue-400', d.isToday ? 'border-2 border-green-500 shadow-md' : '']" class="flex-shrink-0 w-16 h-20 rounded-lg flex flex-col items-center justify-center text-sm transition-all duration-300 snap-center date-card p-1"><span :class="rescheduleModal.date===d.val ? 'text-blue-200' : 'text-slate-400'" class="text-[9px] font-bold uppercase mb-0 transition-colors">{{ d.dayName }}</span><span class="text-2xl font-black leading-none">{{ d.dayNum }}</span><span class="text-[9px] font-medium opacity-80 mt-1">{{ d.month }}</span></button></div></div><div v-if="rescheduleModal.date" class="overflow-y-auto hide-scrollbar p-2 border border-slate-100 rounded-lg bg-white shadow-inner animate-fadeIn max-h-[300px]"><h5 class="text-xs font-black uppercase text-slate-500 tracking-wider mb-2"><i class="fa-solid fa-clock text-green-500"></i> Choisir la Nouvelle Heure (09:00 à 18:00) :</h5><div class="space-y-3"><div class="grid grid-cols-4 gap-2"><button v-for="h in timeSlots" :key="h" @click="rescheduleModal.heure=h" :class="rescheduleModal.heure===h ? 'bg-green-500 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-green-50'" class="py-1.5 rounded-md text-xs font-bold transition-all duration-200">{{ h }}</button></div><div class="pt-2 flex justify-center border-t border-slate-100"><input type="time" v-model="rescheduleModal.heure" class="border-2 border-blue-100 rounded-lg p-2 font-bold text-blue-900 text-center text-sm outline-none focus:border-blue-500 bg-blue-50 w-32"></div></div></div><div v-else class="flex-1 flex items-center justify-center text-center text-gray-400 border border-dashed border-gray-200 rounded-2xl"><p class="text-sm font-medium p-8">📅 Veuillez d'abord sélectionner une date ci-dessus.</p></div><div class="flex gap-2 mt-4"><button @click="rescheduleModal.open=false" class="flex-1 bg-gray-200 text-gray-700 py-3 rounded-xl font-bold hover:bg-gray-300">Annuler</button><button @click="confirmRescheduleStep1" :disabled="!rescheduleModal.date || !rescheduleModal.heure || (rescheduleModal.date === rescheduleModal.rdv.date && rescheduleModal.heure === rescheduleModal.rdv.heure)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md flex items-center justify-center gap-2 transition transform active:scale-95 disabled:opacity-50">Confirmer Report <i class="fa-solid fa-arrow-right"></i></button></div></div><div v-if="rescheduleModal.step===2" class="p-8 text-center animate-fadeIn flex flex-col items-center justify-center h-full"><div class="w-20 h-20 bg-green-100 text-green-500 text-4xl rounded-full flex items-center justify-center mb-6 shadow-lg shadow-green-200/50 animate-bounce"><i class="fa-solid fa-check"></i></div><h4 class="text-2xl font-black text-slate-800 mb-2">Report validé !</h4><p class="text-slate-600 font-medium mb-8 max-w-xs mx-auto">Le rendez-vous a bien été déplacé au <br><strong class="text-blue-600">{{ formatDateLong(rescheduleModal.rdv.date) }} à {{ rescheduleModal.rdv.heure }}</strong>.</p><div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 w-full"><p class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">Voulez-vous prévenir le client ?</p><div class="grid grid-cols-1 gap-3"><button @click="sendRescheduleSMS" class="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition transform active:scale-95 flex items-center justify-center gap-3"><i class="fa-solid fa-comment-sms text-xl"></i> OUI, envoyer le SMS</button><button @click="rescheduleModal.open=false; clientModal.open=false; rescheduleModal.step=1" class="w-full bg-white text-slate-400 border-2 border-slate-100 py-3 rounded-xl font-bold hover:bg-slate-50 hover:text-slate-600 transition">Non, revenir au RDV</button></div></div></div></div></div>
+</div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyDi3NFvmg_acIxicfShqhEd4uQEDMDcizM",
+        authDomain: "bon-de-commande-b05f6.firebaseapp.com",
+        projectId: "bon-de-commande-b05f6",
+        storageBucket: "bon-de-commande-b05f6.firebasestorage.app",
+        messagingSenderId: "884603881750",
+        appId: "1:884603881750:web:816da99e2502225779a837"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    const { createApp, ref, reactive, computed, onMounted } = Vue;
+
+    createApp({
+        setup() {
+            const user = reactive({ logged:false, role:'', name:'' });
+            // LOGIN VARIABLES
+            const loginEmail = ref('');
+            const loginPass = ref('');
+            const loginAdminSelection = ref(false); 
+            
+            const view = ref('dashboard');
+            const currentFilter = ref('all'); 
+            const listFilters = reactive({ agenceId: '', date: '', prospecteur: '' }); // ADDED prospecteur
+            const displayLimit = ref(20); // PAGINATION
+
+            const now = ref(new Date()); 
+            const rdvList = ref([]);
+            let rdvListener = null;
+
+            const agences = ref([]);
+            const sourcesList = ref(['Leboncoin', 'La Centrale', 'Facebook', 'Google', 'Instagram']);
+            const sourceLogos = ref({}); 
+            const adminNamesList = ref(['Nathanaël', 'Charlène', 'Admin']); 
+            
+            const selectedIds = ref([]);
+            const bulkModal = reactive({ open: false, action: '', label: '' });
+            const agencySearch = ref('');
+
+            const wizard = reactive({ open:false, step:1 });
+            const form = reactive({});
+            const clientModal = reactive({ open:false, rdv:null });
+            const settingsModal = reactive({ open:false, tab:'Agences' });
+            const cancelModal = reactive({ open:false, rdv:null });
+            const rescheduleModal = reactive({ open:false, step:1, date:'', heure:'', rdv:null, oldDate:null, oldHeure:null });
+            const pausedAgencyModal = reactive({ open:false, agency:null });
+            
+            const newSource = ref('');
+            const newAdminName = ref('');
+            const showDiscountInput = ref(false);
+            const newNoteText = ref('');
+
+            const editingAgency = ref(null);
+            const editingMsgAgence = ref(null);
+            const editingMsgType = ref('confirm');
+            const clientExists = ref(false);
+            const pauseReasonSelect = ref('Vacances');
+            const showCustomTime = ref(false);
+            const mobileMenuOpen = ref(false);
+
+            const welcomeModal = reactive({ open: false, title: '', message: '', icon: '' });
+
+            const teamList = ref([]);
+            const newMember = reactive({ name:'', email:'', password:'' });
+
+            const msgLabels = { 'confirm': 'Confirmation', 'rappel': 'Rappel Veille', 'rappel_today': 'Rappel Jour J', 'reschedule': 'Report', 'cancel_ag': 'Annulation Agence', 'cancel_clt': 'Annulation Client', 'noshow': 'Lapin', 'noshow_today': 'Lapin (Jour J)' };
+            const filters = reactive({ date: new Date().toISOString().split('T')[0] });
+            const search = ref('');
+            const normalizePhone = (value) => (value || '').replace(/\D/g, '');
+            const formatPhone = (digits) => digits.replace(/(\d{2})(?=\d)/g, '$1 ').trim();
+
+            onMounted(() => {
+                const savedUser = localStorage.getItem('crm_user');
+                if(savedUser) {
+                    const parsed = JSON.parse(savedUser);
+                    user.logged = true;
+                    user.role = parsed.role;
+                    user.name = parsed.name;
+                    loadRdvData();
+                }
+
+                db.collection('agences').onSnapshot(snap => agences.value = snap.docs.map(d => ({id:d.id, templates:{}, ...d.data()})));
+                db.collection('settings').doc('global').onSnapshot(snap => {
+                    if(snap.exists) { 
+                        const data = snap.data(); 
+                        if(data.sources) sourcesList.value = data.sources; 
+                        if(data.logos) sourceLogos.value = data.logos;
+                        if(data.adminNames) adminNamesList.value = data.adminNames;
+                    }
+                });
+                
+                db.collection('users').onSnapshot(snap => {
+                    teamList.value = snap.docs.map(d => ({id:d.id, ...d.data()}));
+                });
+
+                setInterval(() => { now.value = new Date(); }, 10000);
+            });
+
+            const loadRdvData = () => {
+                if(rdvListener) rdvListener();
+                let query = db.collection('rendezvous');
+                if(user.role !== 'admin') {
+                    query = query.where('createdBy', '==', user.name);
+                }
+                rdvListener = query.onSnapshot(snap => {
+                    rdvList.value = snap.docs.map(d => {
+                        const data = d.data();
+                        const created = data.created && data.created.toDate ? data.created.toDate() : (data.created ? new Date(data.created) : null);
+                        return {id:d.id, ...data, created};
+                    });
+                });
+            };
+
+            const checkAndShowWelcome = (email, name) => {
+                const today = new Date().toISOString().split('T')[0];
+                const lastLoginKey = 'lastWelcome_' + email;
+                const lastLoginDate = localStorage.getItem(lastLoginKey);
+                if (lastLoginDate !== today) {
+                    const hour = new Date().getHours();
+                    const isMorning = hour < 13;
+                    if (isMorning) {
+                        welcomeModal.icon = '☀️'; welcomeModal.title = `Bonjour ${name} !`; welcomeModal.message = `J'espère que vous allez bien ! Passez une excellente matinée et bon courage pour vos appels ! 💪`;
+                    } else {
+                        welcomeModal.icon = '👋'; welcomeModal.title = `Re-bonjour ${name} !`; welcomeModal.message = `J'espère que votre matinée s'est bien passée. Excellente après-midi et bonne fin de journée ! 🚀`;
+                    }
+                    welcomeModal.open = true;
+                    launchFireworks();
+                    localStorage.setItem(lastLoginKey, today);
+                }
+            };
+
+            const currentFullDateLabel = computed(() => new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+            const conversionRate = computed(() => { const honored = rdvList.value.filter(r => r.statut === 'honore').length; const noshow = rdvList.value.filter(r => r.statut === 'pas_venu').length; const totalFinished = honored + noshow; if (totalFinished === 0) return 0; return Math.round((honored / totalFinished) * 100); });
+            const conversionRateColor = computed(() => { const rate = conversionRate.value; if (rate < 50) return 'bg-red-50 border-red-200 text-red-700'; if (rate < 80) return 'bg-orange-50 border-orange-200 text-orange-700'; return 'bg-green-50 border-green-200 text-green-700'; });
+            const conversionEmoji = computed(() => { const rate = conversionRate.value; if (rate < 50) return '😭'; if (rate < 80) return '🤨'; return '🤩'; });
+
+            // --- LOGIN LOGIC SIMPLE ---
+            const login = () => { 
+                if(loginEmail.value === 'contact@cetn-solutions.fr' && loginPass.value === '130724') {
+                    loginAdminSelection.value = true;
+                    return;
+                }
+                const match = teamList.value.find(u => u.email === loginEmail.value && u.password === loginPass.value);
+                if(match) {
+                    if(match.blocked) { alert("Accès bloqué. Contactez l'administrateur."); return; }
+                    setUserSession('prospecteur', match.name);
+                    checkAndShowWelcome(match.email, match.name);
+                } else {
+                    alert('Identifiants incorrects');
+                }
+            };
+
+            const finalizeAdminLogin = (name) => {
+                setUserSession('admin', name);
+                checkAndShowWelcome(loginEmail.value, name);
+                loginAdminSelection.value = false;
+            };
+
+            const setUserSession = (role, name) => {
+                user.logged = true; user.role = role; user.name = name;
+                localStorage.setItem('crm_user', JSON.stringify({ role, name })); // PERSISTENCE
+                loadRdvData();
+            };
+
+            const logout = () => { 
+                user.logged=false; loginPass.value=''; loginEmail.value=''; rdvList.value = [];
+                localStorage.removeItem('crm_user'); 
+                if(rdvListener) rdvListener();
+            };
+
+            const addTeamMember = async () => { if(!newMember.name || !newMember.email || !newMember.password) return; await db.collection('users').add({ ...newMember, role: 'prospecteur', blocked: false, created: new Date() }); newMember.name = ''; newMember.email = ''; newMember.password = ''; };
+            const toggleBlockTeamMember = async (member) => { await db.collection('users').doc(member.id).update({ blocked: !member.blocked }); };
+            const deleteTeamMember = async (member) => { if(confirm("Supprimer l'accès de " + member.name + " ?")) await db.collection('users').doc(member.id).delete(); };
+
+            const addAdminName = async () => { if(!newAdminName.value) return; const updated = [...adminNamesList.value, newAdminName.value]; await db.collection('settings').doc('global').set({adminNames: updated}, {merge:true}); newAdminName.value = ''; };
+            const removeAdminName = async (name) => { const updated = adminNamesList.value.filter(n => n !== name); await db.collection('settings').doc('global').set({adminNames: updated}, {merge:true}); };
+
+            const addNote = async () => {
+                if(!newNoteText.value.trim() || !clientModal.rdv) return;
+                const noteObj = { text: newNoteText.value, author: user.name, date: new Date().toISOString() };
+                if(!clientModal.rdv.notes) clientModal.rdv.notes = [];
+                clientModal.rdv.notes.push(noteObj);
+                await db.collection('rendezvous').doc(clientModal.rdv.id).update({ notes: clientModal.rdv.notes });
+                newNoteText.value = '';
+            };
+
+            const onWizardPhoneInput = (e) => { const digits = normalizePhone(e.target.value).slice(0, 10); form.telephone = formatPhone(digits); if (digits.length === 10) { const exist = rdvList.value.find(r => normalizePhone(r.telephone) === digits); if (exist) { form.nom = exist.nom; form.civilite = exist.civilite; form.modele = exist.modele; clientExists.value = true; } else { clientExists.value = false; } } else { clientExists.value = false; } };
+            const onModalPhoneInput = (e) => { const digits = normalizePhone(e.target.value).slice(0, 10); if (!clientModal.rdv) return; clientModal.rdv.telephone = formatPhone(digits); };
+            const startWizard = () => { Object.assign(form, { agence:null, civilite:'M.', nom:'', telephone:'', date:'', heure:'', modele:'', source:'' }); clientExists.value = false; wizard.step = 1; wizard.open = true; agencySearch.value = ''; showCustomTime.value = false; };
+            const checkAgenceAndProceed = async (ag) => { if(ag.statut_activite === 'pause' && ag.motif_pause === 'Vacances' && ag.date_pause_fin) { const today = new Date().toISOString().split('T')[0]; if (today > ag.date_pause_fin) { await db.collection('agences').doc(ag.id).update({ statut_activite: 'actif', motif_pause: '', date_pause_debut: '', date_pause_fin: '' }); ag.statut_activite = 'actif'; } } if(ag.statut_activite === 'pause') { pausedAgencyModal.agency = ag; pausedAgencyModal.open = true; return; } form.agence = ag; wizard.step++; };
+            const getPauseMessage = (ag) => { if(!ag) return ''; if(ag.motif_pause === 'Vacances' && ag.date_pause_debut && ag.date_pause_fin) return `Cette agence est en vacances du ${formatDateShort(ag.date_pause_debut)} au ${formatDateShort(ag.date_pause_fin)}.`; if(ag.motif_pause === 'Complet') return "Cette agence est complète."; if(ag.motif_pause === 'Travaux') return "Cette agence est en travaux."; return `Cette agence est en ${ag.motif_pause || 'pause'}.`; };
+            const selectSource = (src) => { if (!form.modele || !form.modele.trim()) { alert('Merci de renseigner le modèle du véhicule avant de continuer.'); return; } form.source = src; wizard.step++; };
+            const finalizeRdv = async (statut) => { await db.collection('rendezvous').add({ ...form, agenceId: form.agence.id, prix: parseFloat(form.agence.prix)||0, statut, created: new Date(), createdBy: user.name, rappelFait: false }); wizard.open = false; };
+            
+            const openRdvFiche = (r) => { 
+                clientModal.rdv = { ...r }; 
+                showDiscountInput.value = !!r.geste_commercial; 
+                clientModal.open = true; 
+            };
+            const updateRdv = async (r) => { await db.collection('rendezvous').doc(r.id).update(r); clientModal.open = false; };
+            const softDeleteRdv = async (r) => { if(confirm("⚠️ Déplacer vers la corbeille ?")) { await db.collection('rendezvous').doc(r.id).update({statut: 'poubelle'}); clientModal.open = false; }};
+            const deleteRdv = softDeleteRdv;
+            
+            const openCancelChoice = (r) => { cancelModal.rdv = r; cancelModal.open = true; };
+            const confirmCancel = async (r, who) => { await db.collection('rendezvous').doc(r.id).update({ statut: 'annule', motif: who, honorBilling: null }); cancelModal.open = false; clientModal.open = false; };
+            const quickCancel = async (r) => { if(!confirm('Annuler ?')) return; await db.collection('rendezvous').doc(r.id).update({ statut: 'annule', honorBilling: null }); };
+            
+            const updateStatus = async (r, s) => { 
+                const patch = { statut: s }; 
+                if(s==='honor_fact') { patch.statut='honore'; patch.honorBilling='facture'; launchFireworks(); } 
+                if(s==='honor_free') { patch.statut='honore'; patch.honorBilling='gratuit'; launchFireworks(); } 
+                if(s==='noshow') { patch.statut='pas_venu'; patch.honorBilling=null; const today = new Date().toISOString().split('T')[0]; let type = 'noshow'; if(r.date === today) type = 'noshow_today'; const link = generateMsgLink(r, type); if(link) window.open(link, '_blank'); } 
+                if(s==='reset') { patch.statut='confirme'; patch.honorBilling=null; patch.motif=null; delete patch.geste_commercial; delete patch.motif_geste; } 
+                await db.collection('rendezvous').doc(r.id).update(patch); 
+                clientModal.open = false; 
+            };
+
+            const launchFireworks = () => { for(let i=0; i<50; i++) { const c = document.createElement('div'); c.className = 'confetti'; c.style.left = Math.random() * 100 + 'vw'; c.style.top = -10 + 'px'; c.style.backgroundColor = ['#ff0', '#f00', '#0f0', '#00f', '#f0f'][Math.floor(Math.random()*5)]; c.style.animationDuration = (Math.random() * 2 + 1) + 's'; document.body.appendChild(c); setTimeout(() => c.remove(), 3000); } };
+
+            const openRescheduleModal = (r) => { 
+                rescheduleModal.rdv = r; rescheduleModal.date = r.date; rescheduleModal.heure = r.heure; rescheduleModal.oldDate = r.date; rescheduleModal.oldHeure = r.heure; rescheduleModal.step = 1; rescheduleModal.open = true; 
+            };
+
+            const confirmRescheduleStep1 = async () => { 
+                if(!rescheduleModal.date || !rescheduleModal.heure) return alert('Date/Heure requises'); 
+                const newDate = rescheduleModal.date; const newHeure = rescheduleModal.heure;
+                await db.collection('rendezvous').doc(rescheduleModal.rdv.id).update({ date: newDate, heure: newHeure }); 
+                rescheduleModal.rdv.date = newDate; rescheduleModal.rdv.heure = newHeure;
+                if(clientModal.rdv && clientModal.rdv.id === rescheduleModal.rdv.id) { clientModal.rdv.date = newDate; clientModal.rdv.heure = newHeure; }
+                rescheduleModal.step = 2; 
+            };
+
+            const sendRescheduleSMS = () => { 
+                const link = generateMsgLink(rescheduleModal.rdv, 'reschedule'); if(link) window.open(link, '_blank'); 
+                rescheduleModal.open = false; clientModal.open = false; rescheduleModal.step = 1; 
+            };
+            
+            const openReschedule = (r) => openRescheduleModal(r);
+            const changeView = (v) => { 
+                view.value = v; 
+                displayLimit.value = 20; // RESET LIMIT
+                if(v !== 'list') { currentFilter.value = 'all'; } 
+                selectedIds.value = []; 
+            };
+            const resetListFilters = () => { search.value = ''; listFilters.agenceId = ''; listFilters.date = ''; listFilters.prospecteur = ''; currentFilter.value = 'all'; displayLimit.value=20; };
+            const showUpcoming = () => { currentFilter.value = 'upcoming'; view.value = 'list'; displayLimit.value=20; };
+            const showLive = () => { currentFilter.value = 'live'; view.value = 'list'; displayLimit.value=20; };
+            
+            const filteredAgences = computed(() => { if(!agencySearch.value) return agences.value; const s = agencySearch.value.toLowerCase(); return agences.value.filter(ag => ag.nom.toLowerCase().includes(s)); });
+            const trashList = computed(() => rdvList.value.filter(r => r.statut === 'poubelle'));
+            const trashCount = computed(() => trashList.value.length);
+            const restoreRdv = async (r) => { await db.collection('rendezvous').doc(r.id).update({statut: 'confirme'}); };
+            const hardDeleteRdv = async (r) => { if(confirm("Suppression DEFINITIVE ?")) await db.collection('rendezvous').doc(r.id).delete(); };
+
+            const isEnCours = (r) => { if(!r.date || !r.heure) return false; const start = new Date(r.date+'T'+r.heure); const end = new Date(start.getTime() + 60*60*1000); return now.value >= start && now.value < end && ['confirme','a_confirmer'].includes(r.statut); };
+            const activeRdvCount = computed(() => rdvList.value.filter(r => isEnCours(r)).length);
+
+            const filteredList = computed(() => { 
+                let l = rdvList.value.filter(r => r.statut !== 'poubelle'); 
+                if(listFilters.agenceId) { l = l.filter(r => r.agenceId === listFilters.agenceId); } 
+                if(listFilters.prospecteur) { l = l.filter(r => r.createdBy === listFilters.prospecteur); }
+                if(listFilters.date) { l = l.filter(r => r.date === listFilters.date); } 
+                
+                if(currentFilter.value === 'upcoming') { 
+                    if(!listFilters.date) { const today = new Date().toISOString().split('T')[0]; l = l.filter(r => r.statut === 'confirme' && r.date >= today); } 
+                } 
+                else if (currentFilter.value === 'live') {
+                    l = l.filter(r => isEnCours(r));
+                }
+
+                if(search.value) { const s = search.value.toLowerCase(); const sDigits = normalizePhone(search.value); l = l.filter(r => (r.nom || '').toLowerCase().includes(s) || (r.modele || '').toLowerCase().includes(s) || (sDigits && normalizePhone(r.telephone).includes(sDigits))); } 
+                return l.sort((a,b) => b.date.localeCompare(a.date)); 
+            });
+
+            // PAGINATION
+            const displayedList = computed(() => filteredList.value.slice(0, displayLimit.value));
+
+            // LIST OF PROSPECTORS FOR FILTER
+            const allProspectors = computed(() => {
+                const set = new Set();
+                rdvList.value.forEach(r => { if(r.createdBy) set.add(r.createdBy); });
+                teamList.value.forEach(u => set.add(u.name));
+                return Array.from(set).sort();
+            });
+
+            const selectAll = (e) => { const list = view.value === 'trash' ? trashList.value : filteredList.value; if(e.target.checked) { selectedIds.value = list.map(r => r.id); } else { selectedIds.value = []; } };
+            const toggleSelection = (id) => { if(selectedIds.value.includes(id)) { selectedIds.value = selectedIds.value.filter(i => i !== id); } else { selectedIds.value.push(id); } };
+            const isAllSelected = computed(() => { const list = view.value === 'trash' ? trashList.value : filteredList.value; return list.length > 0 && selectedIds.value.length === list.length; });
+
+            const openBulkConfirm = (action, label) => { bulkModal.action = action; bulkModal.label = label; bulkModal.open = true; };
+            const executeBulkAction = async () => { 
+                const batch = db.batch(); 
+                if(bulkModal.action === 'restore_trash') { selectedIds.value.forEach(id => { const ref = db.collection('rendezvous').doc(id); batch.update(ref, { statut: 'confirme' }); }); }
+                else if(bulkModal.action === 'delete_trash') { selectedIds.value.forEach(id => { const ref = db.collection('rendezvous').doc(id); batch.delete(ref); }); }
+                else if(bulkModal.action === 'empty_trash') { trashList.value.forEach(r => { const ref = db.collection('rendezvous').doc(r.id); batch.delete(ref); }); }
+                else { let patch = {}; if(bulkModal.action === 'delete') { patch = { statut: 'poubelle' }; } else if (bulkModal.action === 'honor_fact') { patch = { statut: 'honore', honorBilling: 'facture' }; } else if (bulkModal.action === 'noshow') { patch = { statut: 'pas_venu', honorBilling: null }; } selectedIds.value.forEach(id => { const ref = db.collection('rendezvous').doc(id); batch.update(ref, patch); }); }
+                await batch.commit(); selectedIds.value = []; bulkModal.open = false; 
+            };
+
+            const formatDateFr = (d) => d ? new Date(d).toLocaleDateString('fr-FR') : '';
+            const formatDateShort = (d) => d ? new Date(d).toLocaleDateString('fr-FR', {day:'numeric', month:'short'}) : '';
+            const formatDateLong = (d) => d ? new Date(d).toLocaleDateString('fr-FR', {weekday:'long', day:'numeric', month:'long'}) : '';
+            const formatPrice = (p) => new Intl.NumberFormat('fr-FR', {style:'currency', currency:'EUR'}).format(p);
+            const getAgenceName = (id) => agences.value.find(a=>a.id===id)?.nom || 'Inconnue';
+            const getRappelType = (r) => { if (!r.date) return 'rappel'; const today = new Date(); today.setHours(0,0,0,0); const d = new Date(r.date); d.setHours(0,0,0,0); const diffDays = Math.round((d - today) / 86400000); if (diffDays === 0) return 'rappel_today'; return 'rappel'; };
+            const getRappelLabel = (r) => { const type = getRappelType(r); if(type === 'rappel_today') return 'Rappel Aujourd\'hui'; return 'Rappel Demain'; };
+            
+            const generateMsgLink = (data, type) => {
+                const ag = agences.value.find(a => a.id === data.agenceId) || data.agence || {}; const tpls = ag.templates || {}; 
+                let tpl = tpls[type]; 
+                if (!tpl) tpl = getDefaultTemplate(type); 
+                const showPrice = user.role === 'admin'; const prixStr = (showPrice && ag.prix) ? (ag.prix + '€ ' + (ag.tva ? 'TTC' : 'HT')) : ''; 
+                let dateRappelStr = ''; if (data.date) { const today = new Date(); today.setHours(0,0,0,0); const d = new Date(data.date); d.setHours(0,0,0,0); const diffDays = Math.round((d - today) / 86400000); if (diffDays === 0) dateRappelStr = "aujourd'hui"; else if (diffDays === 1) dateRappelStr = "demain"; else dateRappelStr = formatDateLong(data.date); }
+                let oldDateLong = ''; let oldHeure = ''; if(type === 'reschedule' && rescheduleModal.oldDate) { oldDateLong = formatDateLong(rescheduleModal.oldDate); oldHeure = rescheduleModal.oldHeure || ''; }
+                let msg = tpl.replace(/{{CIVILITE}}/g, data.civilite||'').replace(/{{NOM}}/g, data.nom||'').replace(/{{PRENOM}}/g, data.nom||'').replace(/{{DATE_LONG}}/g, formatDateLong(data.date)).replace(/{{DATE_RAPPEL}}/g, dateRappelStr || formatDateLong(data.date)).replace(/{{HEURE}}/g, data.heure||'').replace(/{{MODELE}}/g, data.modele||'').replace(/{{AGENCE}}/g, ag.nom||'').replace(/{{ADRESSE}}/g, ag.adresse||'').replace(/{{PLAN}}/g, ag.maps||'').replace(/{{PRIX}}/g, prixStr).replace(/{{TAGLINE}}/g, ag.tagline||ag.nom||'');
+                if(type === 'reschedule' && rescheduleModal.oldDate) { msg = msg.replace(/{{OLD_DATE_LONG}}/g, oldDateLong).replace(/{{OLD_HEURE}}/g, oldHeure); }
+                const sep = navigator.userAgent.toLowerCase().includes('iphone') ? '&' : '?'; return `sms:${normalizePhone(data.telephone)}${sep}body=${encodeURIComponent(msg)}`;
+            };
+            const getDefaultTemplate = (t) => { if(t==='confirm') return "Bonjour {{NOM}}, RDV confirmé le {{DATE_LONG}} à {{HEURE}} chez {{AGENCE}}."; if(t==='reschedule') return "Report Confirmé – {{AGENCE}}\n──────────────────\nBonjour,\nVotre rendez-vous du {{OLD_DATE_LONG}} à {{OLD_HEURE}} est reporté.\n\n◆ Nouveau RDV :\n→ Date & Heure : {{DATE_LONG}} à {{HEURE}}\n→ Modèle : {{MODELE}}\n◆ Lieu : {{ADRESSE}}\n\nMerci de nous prévenir en cas d’imprévu\n\nÀ bientôt,\nL’équipe {{AGENCE}}"; if(t==='rappel') return "Rappel RDV demain à {{HEURE}} chez {{AGENCE}}."; if(t==='noshow') return "Bonjour {{NOM}}, vous n'êtes pas venu au RDV."; if(t==='noshow_today') return "Bonjour {{NOM}}, vous aviez RDV aujourd'hui à {{HEURE}} chez {{AGENCE}}. Vous n'êtes pas venu."; return ""; };
+            const openSettings = () => { settingsModal.open = true; if(agences.value.length) editingMsgAgence.value = agences.value[0]; };
+            const openAgencyEdit = (ag) => { if(ag) { editingAgency.value = JSON.parse(JSON.stringify(ag)); if(editingAgency.value.motif_pause && !['Vacances','Complet','Travaux'].includes(editingAgency.value.motif_pause)) { pauseReasonSelect.value = 'Autre'; } else { pauseReasonSelect.value = editingAgency.value.motif_pause || 'Vacances'; } } else { editingAgency.value = { nom:'', adresse:'', maps:'', tagline:'', tva:true, prix:0, templates:{} }; } if(!editingAgency.value.statut_activite) editingAgency.value.statut_activite = 'actif'; };
+            const updatePauseReason = () => { if(pauseReasonSelect.value !== 'Autre') { editingAgency.value.motif_pause = pauseReasonSelect.value; } else { editingAgency.value.motif_pause = ''; } };
+            const calculateTTC = () => { const ht = parseFloat(editingAgency.value.prix_ht) || 0; const tva = parseFloat(editingAgency.value.tva_taux) || 0; editingAgency.value.prix = (ht * (1 + (tva / 100))).toFixed(2); };
+            const saveEditingAgency = async () => { if(!editingAgency.value.nom) return; if(editingAgency.value.id) { await db.collection('agences').doc(editingAgency.value.id).update(editingAgency.value); } else { await db.collection('agences').add(editingAgency.value); } editingAgency.value = null; };
+            const saveAgency = async (ag) => { await db.collection('agences').doc(ag.id).update(ag); };
+            const deleteAgency = async (id) => { if(confirm('Supprimer cette agence ?')) await db.collection('agences').doc(id).delete(); };
+            const addSource = async () => { if(!newSource.value) return; const updated = [...sourcesList.value, newSource.value]; await db.collection('settings').doc('global').set({sources:updated}, {merge:true}); newSource.value = ''; };
+            const removeSource = async (src) => { const updated = sourcesList.value.filter(s => s !== src); await db.collection('settings').doc('global').set({sources:updated}, {merge:true}); };
+            const changeSourceLogo = async (src) => { const url = prompt("Entrez l'URL de l'image pour " + src + " :"); if(url) { const newLogos = { ...sourceLogos.value, [src]: url }; await db.collection('settings').doc('global').set({ logos: newLogos }, { merge: true }); } };
+            const getLogo = (src) => { if(sourceLogos.value && sourceLogos.value[src]) return sourceLogos.value[src]; const s = (src||'').toLowerCase(); if(s.includes('coin')) return 'https://upload.wikimedia.org/wikipedia/commons/e/e1/Leboncoin_Logo_2016.svg'; if(s.includes('centrale')) return 'https://play-lh.googleusercontent.com/y3t-tGfqK_uJ0XQYV9xLqXoXwzX_zXwX_XwX_XwX_XwX_XwX_XwX_XwX_XwX_Xw'; if(s.includes('facebook')) return 'https://upload.wikimedia.org/wikipedia/commons/b/b8/2021_Facebook_icon.svg'; if(s.includes('google')) return 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg'; return `https://www.google.com/s2/favicons?domain=${s.replace(' ','')}.com&sz=64`; };
+            const insertTag = (tag) => { if(!editingMsgAgence.value) return; const area = document.querySelector('textarea'); if(area) { area.setRangeText(tag, area.selectionStart, area.selectionEnd, 'end'); editingMsgAgence.value.templates[editingMsgType.value] = area.value; } };
+            
+            const dateOptions = computed(() => { 
+                const arr = []; const today = new Date(); const days = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam']; const months = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+                for(let i=0; i<14; i++) { 
+                    const d = new Date(); d.setDate(today.getDate()+i); 
+                    const year = d.getFullYear(); const month = String(d.getMonth() + 1).padStart(2, '0'); const day = String(d.getDate()).padStart(2, '0'); const localDateString = `${year}-${month}-${day}`;
+                    arr.push({ val: localDateString, dayName: days[d.getDay()], dayNum: d.getDate(), month: months[d.getMonth()], isToday: i === 0 }); 
+                } 
+                return arr; 
+            });
+            const morningSlots = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30'];
+            const afternoonSlots = ['14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30', '18:00'];
+            const timeSlots = [...morningSlots, ...afternoonSlots]; 
+
+            const sortedDaily = computed(() => { return rdvList.value.filter(r => r.date === filters.date && r.statut !== 'poubelle').sort((a,b) => a.heure.localeCompare(b.heure)).map(r => ({...r, agenceNom: agences.value.find(a=>a.id===r.agenceId)?.nom})); });
+            const isSoon = (dStr) => { const diff = (new Date(dStr) - new Date()) / (1000*3600*24); return diff > -0.5 && diff < 2; };
+            const isCreatedToday = (d) => { if (!d) return false; const date = new Date(d); const today = new Date(); return date.getDate() === today.getDate() && date.getMonth() === today.getMonth() && date.getFullYear() === today.getFullYear(); };
+            const rappelsList = computed(() => rdvList.value.filter(r => ['confirme','a_confirmer'].includes(r.statut) && !r.rappelFait && isSoon(r.date) && !isCreatedToday(r.created) ));
+            const confirmList = computed(() => rdvList.value.filter(r => r.statut === 'a_confirmer'));
+            const rappelCount = computed(() => rappelsList.value.length);
+            const confirmCount = computed(() => confirmList.value.length);
+            
+            const stats = computed(() => ({ 
+                upcoming: rdvList.value.filter(r => r.statut==='confirme').length, 
+                honored: rdvList.value.filter(r => r.statut==='honore').length, 
+                noshow: rdvList.value.filter(r => r.statut==='pas_venu').length, 
+                ca: rdvList.value.filter(r => r.honorBilling==='facture').reduce((acc,r) => { const price = r.prix || 0; const discount = r.geste_commercial || 0; return acc + (price - discount); }, 0) 
+            }));
+
+            const isLateAndNoStatus = (r) => { if(!r.date || !r.heure) return false; const start = new Date(r.date+'T'+r.heure); const end = new Date(start.getTime() + 60*60*1000); return now.value >= end && ['confirme','a_confirmer'].includes(r.statut); };
+            const getProgressPercent = (r) => { if(!r.date || !r.heure) return 0; const start = new Date(r.date+'T'+r.heure).getTime(); const end = start + 3600000; const current = now.value.getTime(); if(current < start) return 0; if(current > end) return 100; return ((current - start) / (end - start)) * 100; };
+            const getRdvTimeStatus = (r) => { if(!r.date || !r.heure) return 'futur'; const start = new Date(r.date+'T'+r.heure).getTime(); const current = now.value.getTime(); if(current >= start && current < start + 3600000) return 'en_cours'; if(current < start && (start - current) < 172800000) return 'bientot'; return 'futur'; };
+            const pendingStatusList = computed(() => { return rdvList.value.filter(r => { if(!['confirme', 'a_confirmer'].includes(r.statut)) return false; if(!r.date || !r.heure) return false; const end = new Date(r.date+'T'+r.heure).getTime() + 3600000; return now.value.getTime() > end; }); });
+            const pendingStatusCount = computed(() => pendingStatusList.value.length);
+            const displayStatus = (r) => { if(r.statut === 'honore') return user.role==='admin' ? (r.honorBilling==='facture'?'Honoré • Facturé':'Honoré • Non facturé') : 'Honoré'; if(r.statut === 'pas_venu') return 'Pas Venu'; if(r.statut === 'annule') return 'Annulé'; if(r.statut === 'a_confirmer') return 'À Confirmer'; return 'Confirmé'; };
+            const statusClass = (s) => ({ 'honore': 'bg-green-100 text-green-700', 'pas_venu': 'bg-red-100 text-red-700', 'annule': 'bg-gray-200 text-gray-500', 'a_confirmer': 'bg-orange-100 text-orange-700', 'confirme': 'bg-blue-100 text-blue-700' }[s] || 'bg-gray-100');
+            const validateAction = async (r, type) => { if(type==='rappels') await db.collection('rendezvous').doc(r.id).update({ rappelFait:true }); if(type==='confirmations') await db.collection('rendezvous').doc(r.id).update({ statut:'confirme' }); };
+            const generateLink = (r, type) => generateMsgLink(r, type);
+
+            return {
+                user, loginEmail, loginPass, view, login, logout, loginAdminSelection, finalizeAdminLogin,
+                rdvList, agences, sourcesList, stats, sortedDaily, filteredList, displayedList, rappelsList, confirmList, rappelCount, confirmCount,
+                wizard, form, clientModal, settingsModal, cancelModal,
+                rescheduleModal, openRescheduleModal, confirmRescheduleStep1, sendRescheduleSMS, deleteRdv: softDeleteRdv, softDeleteRdv,
+                changeView, showUpcoming, showLive, currentFilter, listFilters, resetListFilters, displayLimit,
+                startWizard, finalizeRdv, selectSource,
+                openRdvFiche, updateRdv, openCancelChoice, confirmCancel, quickCancel, updateStatus,
+                openSettings, openAgencyEdit, saveEditingAgency, editingAgency, saveAgency, deleteAgency, addSource, removeSource, changeSourceLogo, getLogo,
+                newSource, editingMsgAgence, editingMsgType, clientExists, insertTag, msgLabels,
+                generateMsgLink, generateLink, validateAction,
+                dateOptions, morningSlots, afternoonSlots, timeSlots, showCustomTime, 
+                filters, search, 
+                formatDateFr, formatDateShort, formatDateLong, formatPrice, isEnCours, isLateAndNoStatus, displayStatus, statusClass, getAgenceName,
+                normalizePhone, onWizardPhoneInput, onModalPhoneInput,
+                getRappelType, getRappelLabel,
+                openReschedule,
+                currentFullDateLabel, checkAgenceAndProceed, pausedAgencyModal, pauseReasonSelect, updatePauseReason,
+                getPauseMessage, getProgressPercent, getRdvTimeStatus,
+                pendingStatusList, pendingStatusCount,
+                selectedIds, selectAll, toggleSelection, isAllSelected, bulkModal, openBulkConfirm, executeBulkAction, 
+                trashList, trashCount, restoreRdv, hardDeleteRdv,
+                agencySearch, filteredAgences,
+                calculateTTC, conversionRate, conversionRateColor, conversionEmoji, activeRdvCount,
+                // NEW VARS
+                teamList, newMember, addTeamMember, toggleBlockTeamMember, deleteTeamMember, mobileMenuOpen, welcomeModal,
+                adminNamesList, newAdminName, addAdminName, removeAdminName,
+                newNoteText, addNote, showDiscountInput, allProspectors
+            };
+        }
+    }).mount('#app');
+</script>
+</body> 
+</html> pour mon petit coup
