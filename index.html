@@ -167,10 +167,25 @@
                         </div>
                         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex items-center gap-4 min-w-[300px] relative overflow-hidden" :class="conversionRateColor"><div class="absolute inset-0 bg-white opacity-80 z-0"></div><div class="z-10 text-5xl emoji-bounce filter drop-shadow-md">{{ conversionEmoji }}</div><div class="z-10 flex-1"><p class="text-xs font-bold uppercase tracking-widest opacity-60">Taux de conversion</p><div class="flex items-baseline gap-2"><span class="text-4xl font-black">{{ conversionRate }}%</span><span class="text-xs font-medium opacity-70">Honorés / Total</span></div><div class="w-full bg-black/10 h-1.5 rounded-full mt-1 overflow-hidden"><div class="h-full bg-black/50 transition-all duration-1000" :style="{width: conversionRate + '%'}"></div></div></div></div>
                     </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-                        <div @click="showUpcoming" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-300 cursor-pointer transition group"><div class="flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider group-hover:text-blue-500">À venir</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.upcoming }}</p></div><div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-xl group-hover:bg-blue-600 group-hover:text-white transition"><i class="fa-solid fa-calendar-days"></i></div></div></div>
-                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition"><div class="flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Honorés</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.honored }}</p></div><div class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 text-xl"><i class="fa-solid fa-check"></i></div></div></div>
-                        <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md transition"><div class="flex justify-between items-start"><div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider">Pas Venus</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.noshow }}</p></div><div class="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 text-xl"><i class="fa-solid fa-user-xmark"></i></div></div></div>
+                   <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                        <div @click="showUpcoming" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:border-blue-300 cursor-pointer transition group">
+                            <div class="flex justify-between items-start">
+                                <div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider group-hover:text-blue-500">À venir</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.upcoming }}</p></div>
+                                <div class="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 text-xl group-hover:bg-blue-600 group-hover:text-white transition"><i class="fa-solid fa-calendar-days"></i></div>
+                            </div>
+                        </div>
+                        <div @click="showHonored" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:border-green-300 cursor-pointer transition group">
+                            <div class="flex justify-between items-start">
+                                <div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider group-hover:text-green-600">Honorés</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.honored }}</p></div>
+                                <div class="w-12 h-12 bg-green-50 rounded-2xl flex items-center justify-center text-green-600 text-xl group-hover:bg-green-600 group-hover:text-white transition"><i class="fa-solid fa-check"></i></div>
+                            </div>
+                        </div>
+                        <div @click="showNoShow" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 hover:shadow-md hover:border-red-300 cursor-pointer transition group">
+                            <div class="flex justify-between items-start">
+                                <div><p class="text-slate-400 text-xs font-bold uppercase tracking-wider group-hover:text-red-600">Pas Venus</p><p class="text-4xl font-extrabold text-slate-800 mt-1">{{ stats.noshow }}</p></div>
+                                <div class="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-600 text-xl group-hover:bg-red-600 group-hover:text-white transition"><i class="fa-solid fa-user-xmark"></i></div>
+                            </div>
+                        </div>
                     </div>
                     <div class="bg-white rounded-3xl shadow-sm border border-slate-100 p-4 md:p-8">
 <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6 gap-4">
@@ -187,11 +202,11 @@
                                     <option v-for="u in allProspectors" :key="u" :value="u">{{ u }}</option>
                                 </select>
 
-                               <button @click="dashboardFilters.onlyLive = !dashboardFilters.onlyLive" 
-                                        :class="dashboardFilters.onlyLive ? 'bg-green-500 text-white shadow-green-200 shadow-md' : (timelineActiveCount > 0 ? 'bg-green-50 text-green-600 border-green-200' : 'bg-white text-slate-400 border-slate-200')"
+                              <button @click="dashboardFilters.onlyLive = !dashboardFilters.onlyLive" 
+                                        :class="dashboardFilters.onlyLive ? 'bg-green-500 text-white shadow-green-200 shadow-md' : (activeRdvCount > 0 ? 'bg-green-50 text-green-600 border-green-200' : 'bg-white text-slate-400 border-slate-200')"
                                         class="px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 border">
-                                    <span :class="timelineActiveCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-slate-300'" class="w-2 h-2 rounded-full block"></span>
-                                    {{ timelineActiveCount }} En cours
+                                    <span :class="activeRdvCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-slate-300'" class="w-2 h-2 rounded-full block"></span>
+                                    {{ activeRdvCount }} En cours
                                 </button>
                             </div>
                         </div>                        <div class="space-y-4 relative"><div class="absolute left-[35px] top-4 bottom-4 w-0.5 bg-slate-100 z-0"></div>
@@ -349,18 +364,26 @@
                     </div>
                 </div>
 
-                <div v-if="view==='trash'" class="bg-white rounded-3xl shadow-sm border border-slate-100 h-full flex flex-col overflow-hidden fade-in relative">
+ <div v-if="view==='trash'" class="bg-white rounded-3xl shadow-sm border border-slate-100 h-full flex flex-col overflow-hidden fade-in relative">
+                    
                     <div class="p-6 border-b bg-slate-50 flex justify-between items-center">
                         <h2 class="text-xl md:text-2xl font-bold text-gray-700"><i class="fa-solid fa-trash-can"></i> Corbeille</h2>
                         <div class="flex items-center gap-3">
                             <span class="text-sm text-gray-500">{{ trashList.length }} éléments</span>
-                            <button v-if="trashList.length > 0 && user.role==='admin'" @click="openBulkConfirm('empty_trash', 'Vider la corbeille')" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200 transition">Tout Vider</button>
+                            <button v-if="trashList.length > 0 && user.role==='admin'" @click="openBulkConfirm('empty_trash', 'Vider TOUTE la corbeille ?')" class="bg-red-100 text-red-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-200 transition">Tout Vider</button>
                         </div>
                     </div>
+
                     <div class="overflow-auto flex-1 p-0 pb-20 hidden md:block">
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-slate-50 text-slate-500 text-xs uppercase sticky top-0 z-10 shadow-sm font-bold">
-                                <tr><th class="p-4 w-10"><input type="checkbox" class="custom-checkbox" @change="selectAll($event)" :checked="isAllSelected && trashList.length > 0"></th><th class="p-4">Date</th><th class="p-4">Client</th><th class="p-4 hidden md:table-cell">Supprimé par</th><th class="p-4 text-right">Actions</th></tr>
+                                <tr>
+                                    <th class="p-4 w-10"><input type="checkbox" class="custom-checkbox" @change="selectAll($event)" :checked="isAllSelected && trashList.length > 0"></th>
+                                    <th class="p-4">Date</th>
+                                    <th class="p-4">Client</th>
+                                    <th class="p-4 hidden md:table-cell">Supprimé par</th>
+                                    <th class="p-4 text-right">Actions</th>
+                                </tr>
                             </thead>
                             <tbody class="text-sm">
                                 <tr v-for="rdv in trashList" :key="rdv.id" class="border-b hover:bg-red-50 transition" :class="{'bg-red-50': selectedIds.includes(rdv.id)}">
@@ -368,20 +391,49 @@
                                     <td class="p-4 text-gray-400"><div class="font-bold line-through">{{ formatDateShort(rdv.date) }}</div></td>
                                     <td class="p-4 opacity-50"><div class="font-bold">{{ rdv.nom }}</div><div>{{ rdv.modele }}</div></td>
                                     <td class="p-4 text-xs font-bold text-gray-400 uppercase hidden md:table-cell">Utilisateur</td>
-                                    <td class="p-4 text-right flex justify-end gap-2"><button @click="restoreRdv(rdv)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-green-200 transition" title="Restaurer"><i class="fa-solid fa-rotate-left"></i></button><button v-if="user.role==='admin'" @click="hardDeleteRdv(rdv)" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-200 transition" title="Supprimer définitivement"><i class="fa-solid fa-ban"></i></button></td>
+                                    <td class="p-4 text-right flex justify-end gap-2">
+                                        <button @click="restoreRdv(rdv)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-green-200 transition" title="Restaurer"><i class="fa-solid fa-rotate-left"></i></button>
+                                        <button v-if="user.role==='admin'" @click="hardDeleteRdv(rdv)" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-200 transition" title="Supprimer définitivement"><i class="fa-solid fa-ban"></i></button>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
+
                     <div class="md:hidden flex-1 overflow-y-auto p-4 space-y-3 pb-24 bg-slate-100">
-                        <div v-for="rdv in trashList" :key="rdv.id" class="bg-white p-4 rounded-2xl shadow-sm border border-red-100 relative">
-                            <div class="absolute top-4 right-4"><input type="checkbox" class="custom-checkbox" :checked="selectedIds.includes(rdv.id)" @change="toggleSelection(rdv.id)"></div>
-                            <div class="flex justify-between items-start mb-2 pr-8 opacity-60"><div><div class="text-xs font-bold text-slate-400 uppercase flex items-center gap-1 line-through"><i class="fa-regular fa-calendar"></i> {{ formatDateShort(rdv.date) }}</div><div class="text-lg font-bold text-slate-800">{{ rdv.nom }}</div></div></div>
+                        <div v-for="rdv in trashList" :key="rdv.id" 
+                             class="p-4 rounded-2xl shadow-sm border relative transition-all duration-200"
+                             :class="selectedIds.includes(rdv.id) ? 'bg-red-50 border-red-300 ring-1 ring-red-200' : 'bg-white border-red-100'">
+                            
+                            <div class="absolute top-4 right-4 z-10">
+                                <input type="checkbox" class="custom-checkbox w-6 h-6" :checked="selectedIds.includes(rdv.id)" @change="toggleSelection(rdv.id)">
+                            </div>
+
+                            <div class="flex justify-between items-start mb-2 pr-8 opacity-60">
+                                <div>
+                                    <div class="text-xs font-bold text-slate-400 uppercase flex items-center gap-1 line-through"><i class="fa-regular fa-calendar"></i> {{ formatDateShort(rdv.date) }}</div>
+                                    <div class="text-lg font-bold text-slate-800">{{ rdv.nom }}</div>
+                                </div>
+                            </div>
                             <div class="flex items-center gap-2 mb-3 text-sm text-slate-600 font-medium opacity-60"><i class="fa-solid fa-car"></i> {{ rdv.modele }}</div>
-                            <div class="flex gap-2 justify-end mt-2 pt-2 border-t"><button @click="restoreRdv(rdv)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-green-200 transition">Restaurer</button><button v-if="user.role==='admin'" @click="hardDeleteRdv(rdv)" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-200 transition">Supprimer</button></div>
+                            
+                            <div class="flex gap-2 justify-end mt-2 pt-2 border-t border-slate-100">
+                                <button @click="restoreRdv(rdv)" class="bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-green-200 transition">Restaurer</button>
+                                <button v-if="user.role==='admin'" @click="hardDeleteRdv(rdv)" class="bg-red-100 text-red-700 px-3 py-1.5 rounded-lg font-bold text-xs hover:bg-red-200 transition">Supprimer</button>
+                            </div>
+                        </div>
+                        
+                        <div v-if="trashList.length === 0" class="text-center text-gray-400 py-10 italic">La corbeille est vide.</div>
+                    </div>
+
+                    <div v-if="selectedIds.length > 0" class="absolute bottom-6 left-4 right-4 md:left-6 md:right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between slide-up z-50 gap-3">
+                        <div class="font-bold pl-2"><span class="text-blue-400 text-xl">{{ selectedIds.length }}</span> sélectionnés</div>
+                        <div class="flex gap-2 w-full md:w-auto justify-end">
+                            <button @click="openBulkConfirm('restore_trash', 'Restaurer la sélection ?')" class="bg-green-600 hover:bg-green-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Restaurer</button>
+                            <button v-if="user.role==='admin'" @click="openBulkConfirm('delete_trash', 'Supprimer DÉFINITIVEMENT ?')" class="bg-red-600 hover:bg-red-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Supprimer</button>
+                            <button @click="selectedIds=[]" class="ml-2 text-gray-400 hover:text-white px-2">✕</button>
                         </div>
                     </div>
-                    <div v-if="selectedIds.length > 0" class="absolute bottom-6 left-4 right-4 md:left-6 md:right-6 bg-slate-900 text-white p-4 rounded-2xl shadow-2xl flex flex-col md:flex-row items-center justify-between slide-up z-20 gap-3"><div class="font-bold pl-2"><span class="text-blue-400 text-xl">{{ selectedIds.length }}</span> sélectionnés</div><div class="flex gap-2 w-full md:w-auto justify-end"><button @click="openBulkConfirm('restore_trash', 'Restaurer')" class="bg-green-600 hover:bg-green-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Restaurer</button><button v-if="user.role==='admin'" @click="openBulkConfirm('delete_trash', 'Supprimer définitivement')" class="bg-red-600 hover:bg-red-500 px-3 md:px-4 py-2 rounded-lg font-bold text-xs md:text-sm transition flex-1 md:flex-none">Supprimer</button><button @click="selectedIds=[]" class="ml-2 text-gray-400 hover:text-white px-2">✕</button></div></div>
                 </div>
                 
                 <div v-if="view==='pending_status'" class="max-w-3xl mx-auto space-y-4 fade-in"><h2 class="text-xl md:text-2xl font-bold mb-6 text-purple-700"><i class="fa-solid fa-clipboard-question"></i> Statuts à définir</h2><div v-if="pendingStatusList.length===0" class="bg-white p-10 rounded-2xl text-center text-gray-400 border border-slate-100 shadow-sm"><i class="fa-solid fa-check-circle text-4xl mb-2 text-green-500"></i><br>Tous les statuts sont à jour !</div><div v-for="r in pendingStatusList" :key="r.id" class="bg-white p-4 md:p-6 rounded-2xl shadow-sm border-l-4 border-purple-500 flex flex-col md:flex-row justify-between items-start md:items-center hover:shadow-md transition group" @click="openRdvFiche(r)"><div class="cursor-pointer flex-1"><div class="font-bold text-lg flex items-center gap-2">{{ r.civilite }} {{ r.nom }} <span class="text-xs bg-gray-100 text-gray-500 px-2 rounded">Terminé</span></div><div class="text-slate-500">{{ formatDateFr(r.date) }} à {{ r.heure }} • {{ r.modele }}</div><div class="text-sm font-bold text-blue-600 mt-1">{{ getAgenceName(r.agenceId) }}</div></div><div class="flex gap-2 w-full md:w-auto"><button @click.stop="updateStatus(r, 'honor_fact')" class="flex-1 md:flex-none bg-green-100 text-green-700 px-4 py-2 rounded-xl font-bold hover:bg-green-200 border border-green-200 text-sm"><i class="fa-solid fa-check"></i> Honoré</button><button @click.stop="updateStatus(r, 'noshow')" class="flex-1 md:flex-none bg-red-100 text-red-700 px-4 py-2 rounded-xl font-bold hover:bg-red-200 border border-red-200 text-sm"><i class="fa-solid fa-user-xmark"></i> Lapin</button></div></div></div>
@@ -867,7 +919,8 @@
             const resetListFilters = () => { search.value = ''; listFilters.agenceId = ''; listFilters.date = ''; listFilters.prospecteur = ''; currentFilter.value = 'all'; displayLimit.value=20; };
             const showUpcoming = () => { currentFilter.value = 'upcoming'; view.value = 'list'; displayLimit.value=20; };
             const showLive = () => { currentFilter.value = 'live'; view.value = 'list'; displayLimit.value=20; };
-            
+            const showHonored = () => { currentFilter.value = 'honored'; view.value = 'list'; displayLimit.value=20; };
+const showNoShow = () => { currentFilter.value = 'noshow'; view.value = 'list'; displayLimit.value=20; };
             const filteredAgences = computed(() => { if(!agencySearch.value) return agences.value; const s = agencySearch.value.toLowerCase(); return agences.value.filter(ag => ag.nom.toLowerCase().includes(s)); });
             const trashList = computed(() => rdvList.value.filter(r => r.statut === 'poubelle'));
             const trashCount = computed(() => trashList.value.length);
@@ -886,21 +939,29 @@
 
             const filteredList = computed(() => { 
                 let l = rdvList.value.filter(r => r.statut !== 'poubelle'); 
+                
+                // Filtres de base
                 if(listFilters.agenceId) { l = l.filter(r => r.agenceId === listFilters.agenceId); } 
                 if(listFilters.prospecteur) { l = l.filter(r => r.createdBy === listFilters.prospecteur); }
                 if(listFilters.date) { l = l.filter(r => r.date === listFilters.date); } 
                 
+                // Filtres Spéciaux (Boutons Dashboard)
                 if(currentFilter.value === 'upcoming') { 
                     if(!listFilters.date) { const today = new Date().toISOString().split('T')[0]; l = l.filter(r => r.statut === 'confirme' && r.date >= today); } 
                 } 
                 else if (currentFilter.value === 'live') {
                     l = l.filter(r => isEnCours(r));
                 }
+                else if (currentFilter.value === 'honored') { // NOUVEAU
+                    l = l.filter(r => r.statut === 'honore');
+                }
+                else if (currentFilter.value === 'noshow') { // NOUVEAU
+                    l = l.filter(r => r.statut === 'pas_venu');
+                }
 
                 if(search.value) { const s = search.value.toLowerCase(); const sDigits = normalizePhone(search.value); l = l.filter(r => (r.nom || '').toLowerCase().includes(s) || (r.modele || '').toLowerCase().includes(s) || (sDigits && normalizePhone(r.telephone).includes(sDigits))); } 
                 return l.sort((a,b) => b.date.localeCompare(a.date)); 
             });
-
             // PAGINATION
             const displayedList = computed(() => filteredList.value.slice(0, displayLimit.value));
 
@@ -1098,7 +1159,7 @@
                 rdvList, agences, sourcesList, stats, sortedDaily, filteredList, displayedList, rappelsList, confirmList, rappelCount, confirmCount,
                 wizard, form, clientModal, settingsModal, cancelModal,
                 rescheduleModal, openRescheduleModal, confirmRescheduleStep1, sendRescheduleSMS, deleteRdv: softDeleteRdv, softDeleteRdv,
-                changeView, showUpcoming, showLive, currentFilter, listFilters, resetListFilters, displayLimit,
+                changeView, showUpcoming, showLive, showHonored, showNoShow, currentFilter, listFilters, resetListFilters, displayLimit,
                 startWizard, finalizeRdv, selectSource,
                 openRdvFiche, updateRdv, openCancelChoice, confirmCancel, quickCancel, updateStatus,
                 openSettings, openAgencyEdit, saveEditingAgency, editingAgency, saveAgency, deleteAgency, addSource, removeSource, changeSourceLogo, getLogo,
@@ -1120,7 +1181,7 @@
                 // NEW VARS
                 teamList, newMember, addTeamMember, toggleBlockTeamMember, deleteTeamMember, mobileMenuOpen, welcomeModal,
                 adminNamesList, newAdminName, addAdminName, removeAdminName,
-                newNoteText, addNote,showDiscountInput, allProspectors, dashboardFilters, dashboardLimit, filteredDaily, timelineActiveCount
+                newNoteText, addNote,showDiscountInput, allProspectors, dashboardFilters, dashboardLimit, filteredDaily
             };
         }
     }).mount('#app');
